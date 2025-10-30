@@ -1,0 +1,26 @@
+{
+  "ciencia": [
+    {
+      "question": "¿Cuál es el planeta más grande del sistema solar?",
+      "options": { "a": "Tierra", "b": "Júpiter", "c": "Saturno", "d": "Marte" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué gas respiran los seres humanos?",
+      "options": { "a": "Nitrógeno", "b": "Oxígeno", "c": "Dióxido de carbono", "d": "Helio" },
+      "answer": "b"
+    }
+  ],
+  "programacion": [
+    {
+      "question": "¿Qué lenguaje se ejecuta en la máquina virtual BEAM?",
+      "options": { "a": "Python", "b": "Erlang", "c": "Elixir", "d": "Rust" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué palabra clave define una función en Elixir?",
+      "options": { "a": "function", "b": "fn", "c": "def", "d": "lambda" },
+      "answer": "c"
+    }
+  ]
+}

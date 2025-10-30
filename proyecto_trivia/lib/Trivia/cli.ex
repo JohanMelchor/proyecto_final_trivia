@@ -34,6 +34,7 @@ defmodule Trivia.CLI do
     case UserManager.register_or_login(username, password) do
       {:ok, user} ->
         IO.puts("\nBienvenido #{user["username"]}!\n")
+        Trivia.Game.start(user["username"])
         main_menu()
 
       {:error, :wrong_password} ->
