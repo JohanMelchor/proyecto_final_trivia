@@ -1,148 +1,125 @@
 defmodule Trivia.Game do
-  alias Trivia.UserManager
+  use GenServer
+  alias Trivia.{UserManager, QuestionBank}
 
-  @questions_file "data/questions.json"
-  @points_correct  10
-  @points_wrong   -5
-  @points_invalid -10
-  @points_timeout -5
+  # ===============================
+  # API pública
+  # ===============================
 
-  def start(username) do
-    IO.puts("\n=== 🎮 ¡Configuración de partida! ===\n")
+  @doc """
+  Inicia un nuevo proceso de juego para un usuario
+  """
+  def start_link(args) when is_map(args) do
+    GenServer.start_link(__MODULE__, args)
+  end
 
-    with {:ok, categories} <- load_categories() do
-      category = select_category(categories)
-      num = select_question_count(category)
-      time = select_time_limit()
+  @doc """
+  Consulta el puntaje actual del juego en curso
+  """
+  def get_score(pid) do
+    GenServer.call(pid, :get_score)
+  end
 
-      IO.puts("\nIniciando partida en '#{category}' con #{num} preguntas y #{time}s por respuesta...\n")
+  @doc """
+  Envía una respuesta del usuario para la pregunta actual
+  """
+  def answer(pid, answer) do
+    GenServer.cast(pid, {:answer, answer})
+  end
 
-      case load_questions(category, num) do
-        {:ok, questions} ->
-          {score, total} = play_rounds(questions, 0, 0, time)
-          IO.puts("\n📊 Resultado final: #{score} puntos (#{total} preguntas)\n")
-          UserManager.update_score(username, score)
-          IO.puts("✅ Puntaje actualizado exitosamente.\n")
+  # ===============================
+  # Callbacks de GenServer
+  # ===============================
 
-        {:error, reason} ->
-          IO.puts("⚠️  Error cargando preguntas: #{inspect(reason)}")
+  @impl true
+  def init(%{username: username, category: category, num: num, time: time, caller: caller}) do
+    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}'...\n")
+
+    questions = QuestionBank.get_random_questions(category, num)
+
+    # Estado inicial del proceso
+    state = %{
+      username: username,
+      questions: questions,
+      current: nil,  # Pregunta actual (nil al inicio)
+      score: 0,
+      time: time,
+      timer_ref: nil,  # Referencia del temporizador
+      caller: caller
+    }
+
+    # Programar la primera pregunta
+    Process.send_after(self(), :next_question, 100)
+
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_info(:next_question, %{questions: []} = state) do
+    if state.caller do
+      send(state.caller, {:game_over, state.score})
+    end
+
+    Trivia.UserManager.update_score(state.username, state.score)
+    {:stop, :normal, state}
+  end
+
+  @impl true
+  def handle_info(:next_question, %{questions: [q | rest]} = state) do
+    # Enviar la pregunta al CLI
+    if state.caller do
+      send(state.caller, {:question, q["question"], q["options"]})
+    end
+
+    # Programar el timeout
+    Process.send_after(self(), :timeout, state.time * 1000)
+
+    {:noreply, %{state | questions: rest, current: q}}
+  end
+
+  @impl true
+  def handle_info(:timeout, state) do
+    IO.puts("\n⏰ Tiempo agotado. -5 puntos.")
+    # Pasar a siguiente pregunta
+    Process.send_after(self(), :next_question, 1000)
+    {:noreply, %{state |
+      score: state.score - 5,
+      timer_ref: nil
+    }}
+  end
+
+  @impl true
+  def handle_cast({:answer, answer}, %{current: q, timer_ref: timer_ref} = state) do
+    # Cancelar temporizador ya que el usuario respondió
+    if timer_ref do
+      Process.cancel_timer(timer_ref)
+    end
+
+    # Evaluar respuesta
+    result =
+      cond do
+        not (answer in Map.keys(q["options"])) ->
+          IO.puts("⚠️ Respuesta inválida. -10 puntos.")
+          -10
+        answer == String.downcase(q["answer"]) ->
+          IO.puts("✅ Correcto. +10 puntos.")
+          10
+        true ->
+          IO.puts("❌ Incorrecto. Era #{q["answer"]}. -5 puntos.")
+          -5
       end
-    end
+
+    # Pasar a siguiente pregunta después de un breve delay
+    Process.send_after(self(), :next_question, 1500)
+
+    {:noreply, %{state |
+      score: state.score + result,
+      timer_ref: nil
+    }}
   end
 
-  # --- CONFIGURACIÓN ---
-  defp load_categories do
-    case File.read(@questions_file) do
-      {:ok, data} ->
-        case Jason.decode(data) do
-          {:ok, categories} -> {:ok, Map.keys(categories)}
-          error -> error
-        end
-      error -> error
-    end
-  end
-
-  defp select_category(categories) do
-    IO.puts("Categorías disponibles:")
-    Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
-      IO.puts("#{i}. #{String.capitalize(cat)}")
-    end)
-    opt = IO.gets("\nSeleccione una categoría: ") |> String.trim()
-    case Integer.parse(opt) do
-      {n, _} when n in 1..length(categories) -> Enum.at(categories, n - 1)
-      _ ->
-        IO.puts("⚠️  Opción inválida, usando la primera categoría por defecto.")
-        hd(categories)
-    end
-  end
-
-  defp select_question_count(_category) do
-    opt = IO.gets("\n¿Cuántas preguntas desea jugar? ") |> String.trim()
-    case Integer.parse(opt) do
-      {n, _} when n > 0 -> n
-      _ ->
-        IO.puts("⚠️  Valor inválido, usando 3 por defecto.")
-        3
-    end
-  end
-
-  defp select_time_limit do
-    opt = IO.gets("\nTiempo límite por pregunta (segundos): ") |> String.trim()
-    case Integer.parse(opt) do
-      {n, _} when n > 0 -> n
-      _ ->
-        IO.puts("⚠️  Tiempo inválido, usando 10 segundos.")
-        10
-    end
-  end
-
-  # --- LÓGICA DE JUEGO ---
-  defp load_questions(category, num) do
-    case File.read(@questions_file) do
-      {:ok, data} ->
-        with {:ok, decoded} <- Jason.decode(data),
-             questions when is_list(questions) <- Map.get(decoded, category) do
-          selected = Enum.take_random(questions, num)
-          {:ok, selected}
-        else
-          _ -> {:error, :no_category}
-        end
-      error -> error
-    end
-  end
-
-  defp play_rounds([], score, total, _time), do: {score, total}
-
-  defp play_rounds([q | rest], score, total, time) do
-    IO.puts("\n#{q["question"]}")
-    Enum.each(q["options"], fn {key, value} ->
-      IO.puts("#{key}. #{value}")
-    end)
-
-    case timed_input(time) do
-      {:ok, answer} ->
-        evaluate_answer(answer, q, score, total, rest, time)
-
-      :timeout ->
-        IO.puts("⏰ Tiempo agotado. Pierdes #{@points_timeout} punto.\n")
-        play_rounds(rest, score + @points_timeout, total + 1, time)
-    end
-  end
-
-  # --- LECTURA CON TEMPORIZADOR ---
-  defp timed_input(seconds) do
-    parent = self()
-
-    task = Task.async(fn ->
-      input = IO.gets("\nTu respuesta (a, b, c, d): ")
-      send(parent, {:user_input, input})
-    end)
-
-    receive do
-      {:user_input, input} ->
-        Task.shutdown(task, :brutal_kill)
-        {:ok, String.trim(input) |> String.downcase()}
-    after
-      seconds * 1000 ->
-        Task.shutdown(task, :brutal_kill)
-        :timeout
-    end
-  end
-
-  # --- EVALUACIÓN ---
-  defp evaluate_answer(answer, q, score, total, rest, time) do
-    cond do
-      not (answer in Map.keys(q["options"])) ->
-        IO.puts("⚠️ Respuesta inválida. #{@points_invalid} punto.\n")
-        play_rounds(rest, score + @points_invalid, total + 1, time)
-
-      answer == String.downcase(q["answer"]) ->
-        IO.puts("✅ Correcto. +#{@points_correct}\n")
-        play_rounds(rest, score + @points_correct, total + 1, time)
-
-      true ->
-        IO.puts("❌ Incorrecto. Era #{q["answer"]}. #{@points_wrong} punto.\n")
-        play_rounds(rest, score + @points_wrong, total + 1, time)
-    end
+  @impl true
+  def handle_call(:get_score, _from, state) do
+    {:reply, state.score, state}
   end
 end
