@@ -13,14 +13,16 @@ defmodule Trivia.CLI do
     1. Iniciar sesión o registrarse
     2. Ver puntaje
     3. Ver ranking general
-    4. Salir
+    4. Ver historial de partidas
+    5. Salir
     """)
 
     case IO.gets("Seleccione una opción: ") |> handle_input() do
       "1" -> login_flow()
       "2" -> show_score()
       "3" -> show_ranking()
-      "4" -> IO.puts("\n¡Hasta luego!\n")
+      "4" -> show_history()
+      "5" -> IO.puts("\n¡Hasta luego!\n")
       _ ->
         IO.puts("\n❌ Opción inválida.\n")
         main_menu()
@@ -142,6 +144,13 @@ defmodule Trivia.CLI do
       IO.puts("\n=========================\n")
     end
 
+    main_menu()
+  end
+
+  def show_history do
+    IO.puts("\n=== 🕑 Historial de Partidas ===\n")
+    Trivia.History.show_last(10)
+    IO.puts("\n=================================\n")
     main_menu()
   end
 

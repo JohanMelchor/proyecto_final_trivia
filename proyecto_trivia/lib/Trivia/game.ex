@@ -41,6 +41,7 @@ defmodule Trivia.Game do
     state = %{
       username: username,
       questions: questions,
+      category: category,
       current: nil,  # Pregunta actual (nil al inicio)
       score: 0,
       time: time,
@@ -61,6 +62,7 @@ defmodule Trivia.Game do
     end
 
     Trivia.UserManager.update_score(state.username, state.score)
+    Trivia.History.save_result(state.username, state.category, state.score)
     {:stop, :normal, state}
   end
 
