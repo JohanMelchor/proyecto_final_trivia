@@ -1,5 +1,6 @@
 defmodule Trivia.CLI do
-  alias Trivia.{UserManager, QuestionBank, Server, Game}
+  alias Trivia.{UserManager, SessionManager, Server, Game, QuestionBank}
+
 
   def start do
     IO.puts("\n=== Bienvenido a Trivia Elixir ===\n")
@@ -26,6 +27,79 @@ defmodule Trivia.CLI do
       _ ->
         IO.puts("\n❌ Opción inválida.\n")
         main_menu()
+    end
+  end
+
+  def start_server do
+    {:ok, _session} = ensure_session_manager_started()
+    {:ok, _server} = ensure_server_started()
+    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA ===\n")
+    session_menu()
+  end
+
+  defp session_menu do
+    IO.puts("""
+    1. Conectarse
+    2. Desconectarse
+    3. Ver usuarios en línea
+    4. Salir
+    """)
+
+    case IO.gets("Seleccione una opción: ") |> String.trim() do
+      "1" -> connect_flow()
+      "2" -> disconnect_flow()
+      "3" -> list_online_flow()
+      "4" -> IO.puts("\n👋 Cerrando servidor...\n")
+      _ ->
+        IO.puts("\n❌ Opción inválida.\n")
+        session_menu()
+    end
+  end
+
+  # --- CONEXIÓN ---
+  defp connect_flow do
+    username = IO.gets("Usuario: ") |> String.trim()
+    password = IO.gets("Contraseña: ") |> String.trim()
+
+    case SessionManager.connect(username, password, self()) do
+      {:ok, msg} ->
+        IO.puts("✅ #{msg}\n")
+      {:error, reason} ->
+        IO.puts("❌ Error: #{inspect(reason)}\n")
+    end
+
+    session_menu()
+  end
+
+  defp disconnect_flow do
+    username = IO.gets("Usuario a desconectar: ") |> String.trim()
+
+    case SessionManager.disconnect(username) do
+      :ok -> IO.puts("👋 Desconectado correctamente.\n")
+      {:error, reason} -> IO.puts("❌ #{reason}\n")
+    end
+
+    session_menu()
+  end
+
+  defp list_online_flow do
+    online = SessionManager.list_online()
+
+    if online == [] do
+      IO.puts("\n⚠️ No hay usuarios conectados.\n")
+    else
+      IO.puts("\n=== Usuarios Conectados ===")
+      Enum.each(online, fn u -> IO.puts("• #{u}") end)
+      IO.puts("===========================\n")
+    end
+
+    session_menu()
+  end
+
+  defp ensure_session_manager_started do
+    case Process.whereis(SessionManager) do
+      nil -> SessionManager.start_link(nil)
+      pid -> {:ok, pid}
     end
   end
 
