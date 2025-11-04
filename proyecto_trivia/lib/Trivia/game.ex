@@ -32,28 +32,28 @@ defmodule Trivia.Game do
   # ===============================
 
   @impl true
-  def init(%{username: username, category: category, num: num, time: time, caller: caller}) do
-    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}'...\n")
+  def init(%{username: username, category: category, num: num, time: time, caller: caller} = args) do
+    mode = Map.get(args, :mode, :multi)
+    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}' (#{mode})...\n")
 
     questions = QuestionBank.get_random_questions(category, num)
 
-    # Estado inicial del proceso
     state = %{
       username: username,
       questions: questions,
       category: category,
-      current: nil,  # Pregunta actual (nil al inicio)
+      current: nil,
       score: 0,
       time: time,
-      timer_ref: nil,  # Referencia del temporizador
-      caller: caller
+      timer_ref: nil,
+      caller: caller,
+      mode: mode
     }
 
-    # Programar la primera pregunta
     Process.send_after(self(), :next_question, 100)
-
     {:ok, state}
   end
+
 
   @impl true
   def handle_info(:next_question, %{questions: []} = state) do
@@ -91,34 +91,32 @@ defmodule Trivia.Game do
   end
 
   @impl true
-  def handle_cast({:answer, answer}, %{current: q, timer_ref: timer_ref} = state) do
-    # Cancelar temporizador ya que el usuario respondió
-    if timer_ref do
-      Process.cancel_timer(timer_ref)
-    end
+  def handle_cast({:answer, answer}, %{current: q, timer_ref: timer_ref, mode: mode} = state) do
+    if timer_ref, do: Process.cancel_timer(timer_ref)
 
-    # Evaluar respuesta
+    {correct, wrong, invalid} =
+      case mode do
+        :single -> {5, -2, -5}
+        :multi -> {10, -5, -10}
+      end
+
     result =
       cond do
         not (answer in Map.keys(q["options"])) ->
-          IO.puts("⚠️ Respuesta inválida. -10 puntos.")
-          -10
+          IO.puts("⚠️ Respuesta inválida. #{invalid} puntos.")
+          invalid
         answer == String.downcase(q["answer"]) ->
-          IO.puts("✅ Correcto. +10 puntos.")
-          10
+          IO.puts("✅ Correcto! +#{correct} puntos.")
+          correct
         true ->
-          IO.puts("❌ Incorrecto. Era #{q["answer"]}. -5 puntos.")
-          -5
+          IO.puts("❌ Incorrecto. Era #{q["answer"]}. #{wrong} puntos.")
+          wrong
       end
 
-    # Pasar a siguiente pregunta después de un breve delay
     Process.send_after(self(), :next_question, 1500)
-
-    {:noreply, %{state |
-      score: state.score + result,
-      timer_ref: nil
-    }}
+    {:noreply, %{state | score: state.score + result, timer_ref: nil}}
   end
+
 
   @impl true
   def handle_call(:get_score, _from, state) do

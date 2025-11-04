@@ -1,118 +1,197 @@
 defmodule Trivia.CLI do
   alias Trivia.{UserManager, SessionManager, Server, Game, QuestionBank}
 
-
+  # ===============================
+  # INICIO
+  # ===============================
   def start do
     IO.puts("\n=== Bienvenido a Trivia Elixir ===\n")
     {:ok, _server} = ensure_server_started()
     main_menu()
   end
 
-  # --- MENÚ PRINCIPAL ---
+  def start_server do
+    {:ok, _session} = ensure_session_manager_started()
+    {:ok, _server} = ensure_server_started()
+    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA ===\n")
+    multiplayer_menu()
+  end
+
+  # ===============================
+  # MENÚ PRINCIPAL
+  # ===============================
   defp main_menu do
     IO.puts("""
-    1. Iniciar sesión o registrarse
-    2. Ver puntaje
-    3. Ver ranking general
-    4. Ver historial de partidas
-    5. Salir
+    1. Jugar Modo Individual
+    2. Jugar Modo Multijugador
+    3. Ver puntaje
+    4. Ver ranking general
+    5. Ver historial
+    6. Salir
     """)
 
     case IO.gets("Seleccione una opción: ") |> handle_input() do
-      "1" -> login_flow()
-      "2" -> show_score()
-      "3" -> show_ranking()
-      "4" -> show_history()
-      "5" -> IO.puts("\n¡Hasta luego!\n")
+      "1" -> singleplayer_flow()
+      "2" -> multiplayer_menu()
+      "3" -> show_score()
+      "4" -> show_ranking()
+      "5" -> show_history()
+      "6" -> IO.puts("\n¡Hasta luego!\n")
       _ ->
         IO.puts("\n❌ Opción inválida.\n")
         main_menu()
     end
   end
 
-  def start_server do
-    {:ok, _session} = ensure_session_manager_started()
-    {:ok, _server} = ensure_server_started()
-    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA ===\n")
-    session_menu()
-  end
-
-  defp session_menu do
+  # ===============================
+  # MENÚ MULTIJUGADOR
+  # ===============================
+  defp multiplayer_menu do
     IO.puts("""
-    1. Conectarse
-    2. Desconectarse
-    3. Ver usuarios en línea
-    4. Salir
+    === 🌐 MODO MULTIJUGADOR ===
+    1. Conectarse a servidor (opcional)
+    2. Crear partida
+    3. Unirse a partida
+    4. Ver partidas activas
+    5. Ver usuarios conectados
+    6. Volver al menú principal
     """)
 
     case IO.gets("Seleccione una opción: ") |> String.trim() do
       "1" -> connect_flow()
-      "2" -> disconnect_flow()
-      "3" -> list_online_flow()
-      "4" -> IO.puts("\n👋 Cerrando servidor...\n")
+      "2" -> create_game_flow()
+      "3" -> join_game_flow()
+      "4" -> list_games_flow()
+      "5" -> list_online_flow()
+      "6" -> main_menu()
       _ ->
         IO.puts("\n❌ Opción inválida.\n")
-        session_menu()
+        multiplayer_menu()
     end
   end
 
-  # --- CONEXIÓN ---
+  # ===============================
+  # NUEVO: LISTAR USUARIOS ONLINE
+  # ===============================
+  defp list_online_flow do
+    users = SessionManager.list_online()
+
+    if users == [] do
+      IO.puts("\n⚠️ No hay usuarios conectados.\n")
+    else
+      IO.puts("\n=== Usuarios Conectados ===")
+      Enum.each(users, fn u -> IO.puts("• #{u}") end)
+      IO.puts("===========================\n")
+    end
+
+    multiplayer_menu()
+  end
+
+  # ===============================
+  # CONEXIÓN
+  # ===============================
   defp connect_flow do
+    IO.puts("\n🌍 Conexión a servidor Trivia")
+    remote = IO.gets("¿Quieres conectar a un nodo remoto? (s/n): ") |> String.trim()
+
+    if remote in ["s", "S"] do
+      host = IO.gets("Host o IP del servidor (ej. server@192.168.1.10): ") |> String.trim()
+      if Node.connect(String.to_atom(host)) do
+        IO.puts("✅ Conectado al servidor #{host}\n")
+      else
+        IO.puts("❌ No se pudo conectar al nodo #{host}\n")
+      end
+    else
+      IO.puts("Conectado localmente.\n")
+    end
+
     username = IO.gets("Usuario: ") |> String.trim()
     password = IO.gets("Contraseña: ") |> String.trim()
 
     case SessionManager.connect(username, password, self()) do
+      {:ok, msg} -> IO.puts("✅ #{msg}\n")
+      {:error, reason} -> IO.puts("❌ Error: #{inspect(reason)}\n")
+    end
+
+    multiplayer_menu()
+  end
+
+  # ===============================
+  # MULTIJUGADOR
+  # ===============================
+  defp create_game_flow do
+    username = IO.gets("Creador (usuario conectado): ") |> String.trim()
+    category = IO.gets("Tema: ") |> String.trim()
+    num = IO.gets("Número de preguntas: ") |> String.trim() |> String.to_integer()
+    time = IO.gets("Tiempo por pregunta (segundos): ") |> String.trim() |> String.to_integer()
+    id = :rand.uniform(9999)
+
+    case Trivia.Lobby.create_game(id, username, category, num, time) do
+      {:ok, _pid} -> IO.puts("✅ Partida #{id} creada correctamente!")
+      {:error, reason} -> IO.puts("❌ Error al crear partida: #{inspect(reason)}")
+    end
+
+    multiplayer_menu()
+  end
+
+  defp join_game_flow do
+    id = IO.gets("ID de partida: ") |> String.trim() |> String.to_integer()
+    username = IO.gets("Usuario: ") |> String.trim()
+
+    case Trivia.Lobby.join_game(id, username, self()) do
       {:ok, msg} ->
-        IO.puts("✅ #{msg}\n")
+        IO.puts("✅ #{msg}")
+        IO.puts("⌛ Esperando preguntas...\n")
+        spawn(fn -> listen_multiplayer() end)
+
+      {:error, :not_found} ->
+        IO.puts("❌ No existe una partida con ese ID.\n")
+
       {:error, reason} ->
         IO.puts("❌ Error: #{inspect(reason)}\n")
     end
 
-    session_menu()
+    multiplayer_menu()
   end
 
-  defp disconnect_flow do
-    username = IO.gets("Usuario a desconectar: ") |> String.trim()
+  defp list_games_flow do
+    IO.puts("\n=== Partidas activas ===")
+    games = Server.list_games()
 
-    case SessionManager.disconnect(username) do
-      :ok -> IO.puts("👋 Desconectado correctamente.\n")
-      {:error, reason} -> IO.puts("❌ #{reason}\n")
-    end
-
-    session_menu()
-  end
-
-  defp list_online_flow do
-    online = SessionManager.list_online()
-
-    if online == [] do
-      IO.puts("\n⚠️ No hay usuarios conectados.\n")
+    if games == [] do
+      IO.puts("No hay partidas disponibles.\n")
     else
-      IO.puts("\n=== Usuarios Conectados ===")
-      Enum.each(online, fn u -> IO.puts("• #{u}") end)
-      IO.puts("===========================\n")
+      Enum.each(games, fn id -> IO.puts("• ID: #{id}") end)
     end
 
-    session_menu()
+    multiplayer_menu()
   end
 
-  defp ensure_session_manager_started do
-    case Process.whereis(SessionManager) do
-      nil -> SessionManager.start_link(nil)
-      pid -> {:ok, pid}
+  # ===============================
+  # ESCUCHAR MENSAJES MULTIJUGADOR
+  # ===============================
+  defp listen_multiplayer do
+    receive do
+      {:game_message, msg} ->
+        IO.puts("\n📢 #{msg}")
+        listen_multiplayer()
+    after
+      60_000 ->
+        IO.puts("\n⏰ Desconectado por inactividad.")
     end
   end
 
-  # --- LOGIN Y REGISTRO ---
-  defp login_flow do
+  # ===============================
+  # SINGLEPLAYER
+  # ===============================
+  defp singleplayer_flow do
     username = IO.gets("Usuario: ") |> handle_input()
     password = IO.gets("Contraseña: ") |> handle_input()
 
     case UserManager.register_or_login(username, password) do
       {:ok, user} ->
-        IO.puts("\n✅ Bienvenido #{user["username"]}!\n")
-        iniciar_partida(user["username"])
-        main_menu()
+        IO.puts("\n✅ Bienvenido #{user["username"]}! — MODO INDIVIDUAL\n")
+        start_single_game(user["username"])
 
       {:error, reason} ->
         IO.puts("\n❌ Error: #{inspect(reason)}\n")
@@ -120,9 +199,8 @@ defmodule Trivia.CLI do
     end
   end
 
-  # --- CONFIGURACIÓN DE PARTIDA ---
-  defp iniciar_partida(username) do
-    IO.puts("\n=== 🎮 Configuración de partida ===\n")
+  defp start_single_game(username) do
+    IO.puts("\n=== 🎯 Configura tu partida ===\n")
 
     categories = QuestionBank.load_categories()
     Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
@@ -130,24 +208,21 @@ defmodule Trivia.CLI do
     end)
 
     category = seleccionar_opcion(categories)
-    num = pedir_numero("¿Cuántas preguntas desea jugar?", 3)
-    time = pedir_numero("Tiempo límite por pregunta (segundos)?", 10)
+    num = pedir_numero("¿Cuántas preguntas deseas?", 3)
+    time = pedir_numero("Tiempo por pregunta (segundos)?", 10)
 
     case Server.start_game(%{
            username: username,
            category: category,
            num: num,
-           time: time
+           time: time,
+           mode: :single
          }) do
-      {:ok, pid} ->
-        play_game(pid)
-
-      {:error, reason} ->
-        IO.puts("\n❌ No se pudo iniciar la partida: #{inspect(reason)}\n")
+      {:ok, pid} -> play_game(pid)
+      {:error, reason} -> IO.puts("❌ No se pudo iniciar el juego: #{inspect(reason)}")
     end
   end
 
-  # --- INTERFAZ DE PARTIDA ---
   defp play_game(pid) do
     receive do
       {:question, question, options} ->
@@ -166,12 +241,14 @@ defmodule Trivia.CLI do
         IO.puts("\n🏁 Fin de la partida. Puntaje total: #{score}")
         IO.puts("=====================================\n")
     after
-      30000 ->
+      30_000 ->
         IO.puts("\n⏰ Tiempo de espera excedido, cerrando partida.")
     end
   end
 
-  # --- UTILIDADES ---
+  # ===============================
+  # UTILIDADES
+  # ===============================
   defp seleccionar_opcion(categories) do
     opt = IO.gets("\nSeleccione una categoría: ") |> String.trim()
     case Integer.parse(opt) do
@@ -191,10 +268,8 @@ defmodule Trivia.CLI do
     username = IO.gets("Ingrese su usuario: ") |> handle_input()
 
     case UserManager.get_score(username) do
-      {:ok, score} ->
-        IO.puts("\nTu Puntaje actual: #{score}\n")
-      _ ->
-        IO.puts("\n⚠️ Usuario no encontrado o error.\n")
+      {:ok, score} -> IO.puts("\nTu Puntaje actual: #{score}\n")
+      _ -> IO.puts("\n⚠️ Usuario no encontrado o error.\n")
     end
 
     main_menu()
@@ -203,7 +278,7 @@ defmodule Trivia.CLI do
   def show_ranking do
     users = UserManager.load_users()
 
-    if length(users) == 0 do
+    if users == [] do
       IO.puts("\n⚠️ No hay usuarios registrados todavía.\n")
     else
       IO.puts("\n=== 🏆 RANKING GENERAL ===\n")
@@ -231,11 +306,17 @@ defmodule Trivia.CLI do
   defp handle_input(nil), do: ""
   defp handle_input(input), do: String.trim(input)
 
-  # Asegura que el servidor esté corriendo
   defp ensure_server_started do
     case Process.whereis(Server) do
       nil -> Server.start_link(nil)
       pid -> {:ok, pid}
+    end
+  end
+
+  defp ensure_session_manager_started do
+    case :global.whereis_name(Trivia.SessionManager) do
+      :undefined -> SessionManager.start_link(nil)
+      pid when is_pid(pid) -> {:ok, pid}
     end
   end
 end
