@@ -71,6 +71,61 @@ defmodule Trivia.CLI do
   end
 
   # ===============================
+  # MENÚS DE LOBBY
+  # ===============================
+
+  defp host_lobby_menu(id, username) do
+    IO.puts("\n=== 🎮 Lobby #{id} (Host: #{username}) ===")
+
+    info = Trivia.Lobby.get_info(id)
+    if is_map(info) do
+      IO.puts("Jugadores: #{Enum.join(info.jugadores, ", ")}")
+    end
+
+    IO.puts("""
+    1. Iniciar partida
+    2. Cancelar partida
+    3. Actualizar lista
+    """)
+
+    case IO.gets("Seleccione: ") |> String.trim() do
+      "1" ->
+        Trivia.Lobby.start_game(id)
+        IO.puts("🚀 Partida iniciada!")
+        listen_multiplayer()
+
+      "2" ->
+        Trivia.Lobby.cancel_game(id)
+        IO.puts("❌ Partida cancelada. Cerrando lobby...")
+        Process.sleep(1500)
+        multiplayer_menu()
+
+      "3" ->
+        host_lobby_menu(id, username)
+
+      _ ->
+        host_lobby_menu(id, username)
+    end
+  end
+
+  defp guest_lobby_menu(id, username) do
+    IO.puts("\n=== 🕒 Esperando inicio de partida #{id} ===")
+    IO.puts("1. Salir de la partida")
+
+    spawn(fn -> listen_multiplayer() end)
+
+    case IO.gets("Seleccione: ") |> String.trim() do
+      "1" ->
+        Trivia.Lobby.leave_game(id, username)
+        IO.puts("🚪 Saliste de la partida.")
+        multiplayer_menu()
+
+      _ ->
+        guest_lobby_menu(id, username)
+    end
+  end
+
+  # ===============================
   # NUEVO: LISTAR USUARIOS ONLINE
   # ===============================
   defp list_online_flow do
@@ -121,17 +176,50 @@ defmodule Trivia.CLI do
   # ===============================
   defp create_game_flow do
     username = IO.gets("Creador (usuario conectado): ") |> String.trim()
-    category = IO.gets("Tema: ") |> String.trim()
-    num = IO.gets("Número de preguntas: ") |> String.trim() |> String.to_integer()
-    time = IO.gets("Tiempo por pregunta (segundos): ") |> String.trim() |> String.to_integer()
-    id = :rand.uniform(9999)
 
-    case Trivia.Lobby.create_game(id, username, category, num, time) do
-      {:ok, _pid} -> IO.puts("✅ Partida #{id} creada correctamente!")
-      {:error, reason} -> IO.puts("❌ Error al crear partida: #{inspect(reason)}")
+    # Verificar si está conectado realmente
+    if not SessionManager.online?(username) do
+      IO.puts("❌ Debes estar conectado al servidor para crear una partida.\n")
+      multiplayer_menu()
+    else
+      categories = QuestionBank.load_categories()
+
+      IO.puts("\n=== Categorías disponibles ===")
+      Enum.each(categories, fn c -> IO.puts("• #{c}") end)
+
+      category = IO.gets("Tema: ") |> String.trim()
+
+      if not Enum.member?(categories, category) do
+        IO.puts("⚠️ Categoría inválida. Intenta de nuevo.\n")
+        multiplayer_menu()
+      else
+        num = IO.gets("Número de preguntas: ") |> String.trim() |> String.to_integer()
+        time = IO.gets("Tiempo por pregunta (segundos): ") |> String.trim() |> String.to_integer()
+        id = :rand.uniform(9999)
+
+        case Trivia.Lobby.create_game(id, username, category, num, time) do
+          {:ok, _pid} ->
+            IO.puts("✅ Partida #{id} creada correctamente!\n")
+            host_lobby_menu(id, username)
+
+          {:error, :invalid_user} ->
+            IO.puts("❌ El usuario no está conectado.\n")
+            multiplayer_menu()
+
+          {:error, :invalid_category} ->
+            IO.puts("⚠️ Categoría inválida.\n")
+            multiplayer_menu()
+
+          {:error, :no_questions} ->
+            IO.puts("⚠️ No hay preguntas disponibles en esa categoría.\n")
+            multiplayer_menu()
+
+          {:error, reason} ->
+            IO.puts("❌ Error: #{inspect(reason)}")
+            multiplayer_menu()
+        end
+      end
     end
-
-    multiplayer_menu()
   end
 
   defp join_game_flow do
@@ -141,17 +229,20 @@ defmodule Trivia.CLI do
     case Trivia.Lobby.join_game(id, username, self()) do
       {:ok, msg} ->
         IO.puts("✅ #{msg}")
-        IO.puts("⌛ Esperando preguntas...\n")
-        spawn(fn -> listen_multiplayer() end)
+        guest_lobby_menu(id, username)
+
+      {:error, :invalid_user} ->
+        IO.puts("❌ El usuario no está conectado. Usa la opción 'Conectarse al servidor' antes.\n")
+        multiplayer_menu()
 
       {:error, :not_found} ->
         IO.puts("❌ No existe una partida con ese ID.\n")
+        multiplayer_menu()
 
       {:error, reason} ->
         IO.puts("❌ Error: #{inspect(reason)}\n")
+        multiplayer_menu()
     end
-
-    multiplayer_menu()
   end
 
   defp list_games_flow do

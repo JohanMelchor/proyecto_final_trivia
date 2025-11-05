@@ -1,125 +1,137 @@
 defmodule Trivia.Game do
   use GenServer
-  alias Trivia.{UserManager, QuestionBank}
+  alias Trivia.{UserManager, QuestionBank, History}
 
   # ===============================
   # API pública
   # ===============================
 
-  @doc """
-  Inicia un nuevo proceso de juego para un usuario
-  """
   def start_link(args) when is_map(args) do
     GenServer.start_link(__MODULE__, args)
   end
 
-  @doc """
-  Consulta el puntaje actual del juego en curso
-  """
-  def get_score(pid) do
-    GenServer.call(pid, :get_score)
-  end
-
-  @doc """
-  Envía una respuesta del usuario para la pregunta actual
-  """
-  def answer(pid, answer) do
-    GenServer.cast(pid, {:answer, answer})
+  def answer(pid, username, answer) do
+    GenServer.cast(pid, {:answer, username, answer})
   end
 
   # ===============================
-  # Callbacks de GenServer
+  # Inicialización
   # ===============================
 
   @impl true
-  def init(%{username: username, category: category, num: num, time: time, caller: caller} = args) do
-    mode = Map.get(args, :mode, :multi)
-    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}' (#{mode})...\n")
+  def init(%{mode: :multi} = args) do
+    IO.puts("\n🎮 Iniciando partida MULTIJUGADOR en '#{args.category}'...\n")
+
+    questions = QuestionBank.get_random_questions(args.category, args.num)
+
+    if questions == [] do
+      IO.puts("⚠️ No hay preguntas disponibles para la categoría #{args.category}.")
+      {:stop, :no_questions}
+    else
+      state = %{
+        mode: :multi,
+        lobby_pid: args.lobby_pid,
+        players: args.players,
+        category: args.category,
+        questions: questions,
+        current: nil,
+        time: args.time
+      }
+
+      Process.send_after(self(), :next_question, 500)
+      {:ok, state}
+    end
+  end
+
+  def init(%{mode: :single, username: username, category: category, num: num, time: time, caller: caller}) do
+    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}' (singleplayer)...\n")
 
     questions = QuestionBank.get_random_questions(category, num)
 
     state = %{
+      mode: :single,
       username: username,
-      questions: questions,
+      caller: caller,
       category: category,
+      questions: questions,
       current: nil,
       score: 0,
-      time: time,
-      timer_ref: nil,
-      caller: caller,
-      mode: mode
+      time: time
     }
 
-    Process.send_after(self(), :next_question, 100)
+    Process.send_after(self(), :next_question, 500)
     {:ok, state}
   end
 
+  # ===============================
+  # MANEJO DE PREGUNTAS
+  # ===============================
 
   @impl true
-  def handle_info(:next_question, %{questions: []} = state) do
-    if state.caller do
-      send(state.caller, {:game_over, state.score})
-    end
-
-    Trivia.UserManager.update_score(state.username, state.score)
-    Trivia.History.save_result(state.username, state.category, state.score)
+  def handle_info(:next_question, %{mode: :multi, questions: []} = state) do
+    send(state.lobby_pid, {:game_over, state.players})
     {:stop, :normal, state}
   end
 
-  @impl true
-  def handle_info(:next_question, %{questions: [q | rest]} = state) do
-    # Enviar la pregunta al CLI
-    if state.caller do
-      send(state.caller, {:question, q["question"], q["options"]})
-    end
-
-    # Programar el timeout
+  def handle_info(:next_question, %{mode: :multi, questions: [q | rest]} = state) do
+    send(state.lobby_pid, {:question, q})
     Process.send_after(self(), :timeout, state.time * 1000)
-
     {:noreply, %{state | questions: rest, current: q}}
   end
 
-  @impl true
-  def handle_info(:timeout, state) do
+  def handle_info(:timeout, %{mode: :multi} = state) do
+    send(state.lobby_pid, {:timeout, state.current})
+    Process.send_after(self(), :next_question, 2000)
+    {:noreply, %{state | current: nil}}
+  end
+
+  # --- SINGLEPLAYER ---
+  def handle_info(:next_question, %{mode: :single, questions: []} = state) do
+    UserManager.update_score(state.username, state.score)
+    History.save_result(state.username, state.category, state.score)
+
+    if state.caller, do: send(state.caller, {:game_over, state.score})
+    {:stop, :normal, state}
+  end
+
+  def handle_info(:next_question, %{mode: :single, questions: [q | rest]} = state) do
+    if state.caller, do: send(state.caller, {:question, q["question"], q["options"]})
+    Process.send_after(self(), :timeout, state.time * 1000)
+    {:noreply, %{state | questions: rest, current: q}}
+  end
+
+  def handle_info(:timeout, %{mode: :single} = state) do
     IO.puts("\n⏰ Tiempo agotado. -5 puntos.")
-    # Pasar a siguiente pregunta
     Process.send_after(self(), :next_question, 1000)
-    {:noreply, %{state |
-      score: state.score - 5,
-      timer_ref: nil
-    }}
+    {:noreply, %{state | score: state.score - 5}}
   end
 
+  # ===============================
+  # RESPUESTAS
+  # ===============================
+
   @impl true
-  def handle_cast({:answer, answer}, %{current: q, timer_ref: timer_ref, mode: mode} = state) do
-    if timer_ref, do: Process.cancel_timer(timer_ref)
+  def handle_cast({:answer, username, ans}, %{mode: :multi, current: q} = state) do
+    if q && Map.has_key?(state.players, username) do
+      correct = String.downcase(ans) == String.downcase(q["answer"])
+      delta = if correct, do: 10, else: -5
 
-    {correct, wrong, invalid} =
-      case mode do
-        :single -> {5, -2, -5}
-        :multi -> {10, -5, -10}
-      end
+      updated_players =
+        Map.update!(state.players, username, fn p ->
+          %{p | score: p.score + delta}
+        end)
 
-    result =
-      cond do
-        not (answer in Map.keys(q["options"])) ->
-          IO.puts("⚠️ Respuesta inválida. #{invalid} puntos.")
-          invalid
-        answer == String.downcase(q["answer"]) ->
-          IO.puts("✅ Correcto! +#{correct} puntos.")
-          correct
-        true ->
-          IO.puts("❌ Incorrecto. Era #{q["answer"]}. #{wrong} puntos.")
-          wrong
-      end
+      send(state.lobby_pid, {:player_answered, username, correct, delta})
+      {:noreply, %{state | players: updated_players}}
+    else
+      {:noreply, state}
+    end
+  end
 
+  def handle_cast({:answer, answer}, %{mode: :single, current: q} = state) do
+    correct = String.downcase(answer) == String.downcase(q["answer"])
+    delta = if correct, do: 5, else: -2
     Process.send_after(self(), :next_question, 1500)
-    {:noreply, %{state | score: state.score + result, timer_ref: nil}}
-  end
-
-
-  @impl true
-  def handle_call(:get_score, _from, state) do
-    {:reply, state.score, state}
+    {:noreply, %{state | score: state.score + delta}}
   end
 end
