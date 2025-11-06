@@ -51,11 +51,13 @@ defmodule Trivia.Lobby do
 
   def start_game(id), do: cast(id, :start)
   def cancel_game(id), do: cast(id, :cancel)
-  defp cast(id, msg), do:
+  defp cast(id, msg) do
     case :global.whereis_name({:lobby, id}) do
       :undefined -> {:error, :not_found}
       pid -> GenServer.cast(pid, msg)
     end
+  end
+
 
   # ===============================
   # Callbacks
