@@ -10,9 +10,9 @@ defmodule Trivia.Game do
     GenServer.start_link(__MODULE__, args)
   end
 
-  def answer(pid, username, answer) do
-    GenServer.cast(pid, {:answer, username, answer})
-  end
+  # Unificada: el CLI puede pasar 2 o 3 argumentos según el modo
+  def answer(pid, answer), do: GenServer.cast(pid, {:answer, answer})
+  def answer(pid, username, answer), do: GenServer.cast(pid, {:answer, username, answer})
 
   # ===============================
   # Inicialización
@@ -35,7 +35,8 @@ defmodule Trivia.Game do
         category: args.category,
         questions: questions,
         current: nil,
-        time: args.time
+        time: args.time,
+        timer_ref: nil
       }
 
       Process.send_after(self(), :next_question, 500)
@@ -56,7 +57,8 @@ defmodule Trivia.Game do
       questions: questions,
       current: nil,
       score: 0,
-      time: time
+      time: time,
+      timer_ref: nil
     }
 
     Process.send_after(self(), :next_question, 500)
@@ -67,6 +69,7 @@ defmodule Trivia.Game do
   # MANEJO DE PREGUNTAS
   # ===============================
 
+  # --- MULTIJUGADOR ---
   @impl true
   def handle_info(:next_question, %{mode: :multi, questions: []} = state) do
     send(state.lobby_pid, {:game_over, state.players})
@@ -75,35 +78,34 @@ defmodule Trivia.Game do
 
   def handle_info(:next_question, %{mode: :multi, questions: [q | rest]} = state) do
     send(state.lobby_pid, {:question, q})
-    Process.send_after(self(), :timeout, state.time * 1000)
-    {:noreply, %{state | questions: rest, current: q}}
+    ref = Process.send_after(self(), :timeout, state.time * 1000)
+    {:noreply, %{state | questions: rest, current: q, timer_ref: ref}}
   end
 
   def handle_info(:timeout, %{mode: :multi} = state) do
     send(state.lobby_pid, {:timeout, state.current})
     Process.send_after(self(), :next_question, 2000)
-    {:noreply, %{state | current: nil}}
+    {:noreply, %{state | current: nil, timer_ref: nil}}
   end
 
   # --- SINGLEPLAYER ---
   def handle_info(:next_question, %{mode: :single, questions: []} = state) do
     UserManager.update_score(state.username, state.score)
     History.save_result(state.username, state.category, state.score)
-
     if state.caller, do: send(state.caller, {:game_over, state.score})
     {:stop, :normal, state}
   end
 
   def handle_info(:next_question, %{mode: :single, questions: [q | rest]} = state) do
     if state.caller, do: send(state.caller, {:question, q["question"], q["options"]})
-    Process.send_after(self(), :timeout, state.time * 1000)
-    {:noreply, %{state | questions: rest, current: q}}
+    ref = Process.send_after(self(), :timeout, state.time * 1000)
+    {:noreply, %{state | questions: rest, current: q, timer_ref: ref}}
   end
 
   def handle_info(:timeout, %{mode: :single} = state) do
     IO.puts("\n⏰ Tiempo agotado. -5 puntos.")
     Process.send_after(self(), :next_question, 1000)
-    {:noreply, %{state | score: state.score - 5}}
+    {:noreply, %{state | score: state.score - 5, current: nil, timer_ref: nil}}
   end
 
   # ===============================
@@ -122,7 +124,11 @@ defmodule Trivia.Game do
         end)
 
       send(state.lobby_pid, {:player_answered, username, correct, delta})
-      {:noreply, %{state | players: updated_players}}
+
+      if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+      Process.send_after(self(), :next_question, 1500)
+
+      {:noreply, %{state | players: updated_players, current: nil, timer_ref: nil}}
     else
       {:noreply, state}
     end
@@ -131,7 +137,8 @@ defmodule Trivia.Game do
   def handle_cast({:answer, answer}, %{mode: :single, current: q} = state) do
     correct = String.downcase(answer) == String.downcase(q["answer"])
     delta = if correct, do: 5, else: -2
+    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
     Process.send_after(self(), :next_question, 1500)
-    {:noreply, %{state | score: state.score + delta}}
+    {:noreply, %{state | score: state.score + delta, current: nil, timer_ref: nil}}
   end
 end

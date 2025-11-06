@@ -4,11 +4,14 @@ defmodule Trivia.Lobby do
 
   @max_players 4
 
+  # ===============================
+  # Creación y registro global
+  # ===============================
   def start_link(%{id: id} = args) do
     GenServer.start_link(__MODULE__, args, name: {:global, {:lobby, id}})
   end
 
-  # Crear partida (con validaciones de usuario y categoría)
+  # Crear partida (con validaciones)
   def create_game(id, owner, category, num, time) do
     cond do
       not SessionManager.online?(owner) ->
@@ -19,20 +22,33 @@ defmodule Trivia.Lobby do
 
       true ->
         questions = QuestionBank.get_random_questions(category, num)
+
         if questions == [] do
           {:error, :no_questions}
         else
-          DynamicSupervisor.start_child(
-            Trivia.Server,
-            {__MODULE__, %{id: id, owner: owner, category: category, num: num, time: time}}
-          )
+          case DynamicSupervisor.start_child(
+                 Trivia.Server,
+                 {__MODULE__, %{id: id, owner: owner, category: category, num: num, time: time}}
+               ) do
+            {:ok, pid} ->
+              {:ok, pid}
+
+            {:error, reason} ->
+              {:error, reason}
+
+            other ->
+              {:error, other}
+          end
         end
     end
   end
 
+  # Unirse a partida existente
   def join_game(id, username, caller) do
     case :global.whereis_name({:lobby, id}) do
-      :undefined -> {:error, :not_found}
+      :undefined ->
+        {:error, :not_found}
+
       pid ->
         if SessionManager.online?(username) do
           GenServer.call(pid, {:join, username, caller})
@@ -51,6 +67,7 @@ defmodule Trivia.Lobby do
 
   def start_game(id), do: cast(id, :start)
   def cancel_game(id), do: cast(id, :cancel)
+
   defp cast(id, msg) do
     case :global.whereis_name({:lobby, id}) do
       :undefined -> {:error, :not_found}
@@ -58,11 +75,9 @@ defmodule Trivia.Lobby do
     end
   end
 
-
   # ===============================
-  # Callbacks
+  # Callbacks principales
   # ===============================
-
   @impl true
   def init(%{id: id, owner: owner, category: category, num: num, time: time}) do
     questions = QuestionBank.get_random_questions(category, num)
@@ -72,9 +87,24 @@ defmodule Trivia.Lobby do
       {:stop, :no_questions}
     else
       IO.puts("🎮 Lobby #{id} creado por #{owner}. Esperando jugadores...")
-      {:ok, %{id: id, owner: owner, category: category, num: num, time: time, started: false, players: %{owner => %{pid: nil, score: 0}}, game_pid: nil}}
+
+      # Crear estado inicial
+      state = %{
+        id: id,
+        owner: owner,
+        category: category,
+        num: num,
+        time: time,
+        started: false,
+        players: %{owner => %{pid: nil, score: 0}},
+        game_pid: nil
+      }
+
+      # Programar cierre por inactividad (3 min)
+      Process.send_after(self(), :timeout_lobby, 180_000)
+
+      {:ok, state}
     end
-    Process.send_after(self(), :timeout_lobby, 180_000)
   end
 
   @impl true
@@ -88,18 +118,44 @@ defmodule Trivia.Lobby do
     end
   end
 
+  # ===============================
+  # Jugadores
+  # ===============================
   @impl true
   def handle_call({:join, username, caller}, _from, state) do
     cond do
-      state.started -> {:reply, {:error, :started}, state}
-      map_size(state.players) >= @max_players -> {:reply, {:error, :full}, state}
-      Map.has_key?(state.players, username) -> {:reply, {:error, :already}, state}
+      state.started ->
+        {:reply, {:error, :started}, state}
+
+      map_size(state.players) >= @max_players ->
+        {:reply, {:error, :full}, state}
+
+      Map.has_key?(state.players, username) ->
+        {:reply, {:error, :already}, state}
+
       true ->
         send_message_to_all(state.players, "👋 #{username} se unió a la partida.")
-        {:reply, {:ok, "Unido"}, %{state | players: Map.put(state.players, username, %{pid: caller, score: 0})}}
+        IO.puts("✅ #{username} se unió al lobby #{state.id}")
+        new_state = %{state | players: Map.put(state.players, username, %{pid: caller, score: 0})}
+        {:reply, {:ok, "Unido correctamente"}, new_state}
     end
   end
 
+  @impl true
+  def handle_cast({:leave, username}, state) do
+    if Map.has_key?(state.players, username) do
+      send_message_to_all(state.players, "🚪 #{username} abandonó la partida.")
+      IO.puts("👋 #{username} salió del lobby #{state.id}")
+      new_state = %{state | players: Map.delete(state.players, username)}
+      {:noreply, new_state}
+    else
+      {:noreply, state}
+    end
+  end
+
+  # ===============================
+  # Control de partida
+  # ===============================
   @impl true
   def handle_cast(:start, state) do
     {:ok, game_pid} =
@@ -113,26 +169,20 @@ defmodule Trivia.Lobby do
       })
 
     send_message_to_all(state.players, "🚀 ¡Partida iniciada!")
+    IO.puts("🕹️ Partida del lobby #{state.id} iniciada.")
     {:noreply, %{state | started: true, game_pid: game_pid}}
   end
 
   @impl true
   def handle_cast(:cancel, state) do
     send_message_to_all(state.players, "❌ El host canceló la partida.")
+    IO.puts("❌ Lobby #{state.id} cancelado por el host.")
     {:stop, :normal, state}
   end
 
-  @impl true
-  def handle_cast({:leave, username}, state) do
-    if Map.has_key?(state.players, username) do
-      send_message_to_all(state.players, "🚪 #{username} abandonó la partida.")
-      {:noreply, %{state | players: Map.delete(state.players, username)}}
-    else
-      {:noreply, state}
-    end
-  end
-
-  # Eventos del Game
+  # ===============================
+  # Comunicación con Trivia.Game
+  # ===============================
   @impl true
   def handle_info({:question, q}, state) do
     send_message_to_all(state.players, "\n❓ #{q["question"]}")
@@ -141,7 +191,10 @@ defmodule Trivia.Lobby do
   end
 
   def handle_info({:player_answered, username, correct, delta}, state) do
-    send_message_to_all(state.players, "#{username} respondió #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+    send_message_to_all(
+      state.players,
+      "#{username} respondió #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)"
+    )
     {:noreply, state}
   end
 
@@ -151,7 +204,7 @@ defmodule Trivia.Lobby do
   end
 
   def handle_info({:game_over, players}, state) do
-    send_message_to_all(players, "🏁 Fin de la partida!")
+    send_message_to_all(players, "🏁 ¡Fin de la partida!")
     Enum.each(players, fn {u, %{score: s}} ->
       UserManager.update_score(u, s)
       History.save_result(u, state.category, s)
@@ -159,6 +212,9 @@ defmodule Trivia.Lobby do
     {:stop, :normal, state}
   end
 
+  # ===============================
+  # Utilidad de envío de mensajes
+  # ===============================
   defp send_message_to_all(players, msg) do
     Enum.each(players, fn {_u, %{pid: pid}} ->
       if pid, do: send(pid, {:game_message, msg})
