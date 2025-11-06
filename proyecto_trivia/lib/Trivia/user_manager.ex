@@ -15,22 +15,25 @@ defmodule Trivia.UserManager do
   Si el usuario no existe, se crea.
   Si ya existe, valida la contraseña.
   """
-  def register_or_login(username, password) do
+  def register(username, password) do
     users = load_users()
-
-    case Enum.find(users, fn u -> u["username"] == username end) do
-      nil ->
-        new_user = %{"username" => username, "password" => password, "score" => 0}
-        save_users([new_user | users])
-        {:ok, new_user}
-
-      %{"password" => ^password} = existing_user ->
-        {:ok, existing_user}
-
-      _ ->
-        {:error, "Contraseña incorrecta"}
+    if Enum.any?(users, &(&1["username"] == username)) do
+      {:error, "Usuario ya existe"}
+    else
+      new_user = %{"username" => username, "password" => password, "score" => 0}
+      save_users([new_user | users])
+      {:ok, new_user}
     end
   end
+
+  def login(username, password) do
+    users = load_users()
+    case Enum.find(users, &(&1["username"] == username && &1["password"] == password)) do
+      nil -> {:error, "Usuario o contraseña incorrectos"}
+      user -> {:ok, user}
+    end
+  end
+
 
   @doc """
   Devuelve el puntaje acumulado de un usuario.

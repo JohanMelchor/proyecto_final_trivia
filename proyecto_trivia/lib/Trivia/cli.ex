@@ -138,36 +138,36 @@ defmodule Trivia.CLI do
         IO.puts("⚠️ No hay categorías disponibles.\n")
         main_menu(username)
       else
-        IO.puts("\n=== Categorías disponibles ===")
-        Enum.each(categories, fn c -> IO.puts("• #{c}") end)
+        IO.puts("\n=== 🎮 Configuración de la partida multijugador ===\n")
 
-        category = IO.gets("Tema: ") |> String.trim()
+        # Mostrar categorías disponibles con numeración
+        Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
+          IO.puts("#{i}. #{String.capitalize(cat)}")
+        end)
 
-        if not Enum.member?(categories, category) do
-          IO.puts("⚠️ Categoría inválida.\n")
-          multiplayer_menu(username)
-        else
-          num = pedir_numero("Número de preguntas:", 3)
-          time = pedir_numero("Tiempo por pregunta (segundos):", 10)
-          id = :rand.uniform(9999)
+        # Usar la misma función que singleplayer
+        category = seleccionar_opcion(categories)
+        num = pedir_numero("Número de preguntas:", 3)
+        time = pedir_numero("Tiempo por pregunta (segundos):", 10)
 
-          case Trivia.Lobby.create_game(id, username, category, num, time) do
-            {:ok, _pid} ->
-              IO.puts("✅ Partida #{id} creada correctamente!\n")
-              host_lobby_menu(id, username)
+        id = :rand.uniform(9999)
 
-            {:error, :invalid_user} ->
-              IO.puts("❌ El usuario no está conectado.\n")
-              multiplayer_menu(username)
+        case Trivia.Lobby.create_game(id, username, category, num, time) do
+          {:ok, _pid} ->
+            IO.puts("\n✅ Partida #{id} creada correctamente!")
+            host_lobby_menu(id, username)
 
-            {:error, :invalid_category} ->
-              IO.puts("⚠️ Categoría inválida.\n")
-              multiplayer_menu(username)
+          {:error, :invalid_user} ->
+            IO.puts("❌ El usuario no está conectado.\n")
+            multiplayer_menu(username)
 
-            {:error, reason} ->
-              IO.puts("❌ Error: #{inspect(reason)}\n")
-              multiplayer_menu(username)
-          end
+          {:error, :invalid_category} ->
+            IO.puts("⚠️ Categoría inválida.\n")
+            multiplayer_menu(username)
+
+          {:error, reason} ->
+            IO.puts("❌ Error al crear partida: #{inspect(reason)}\n")
+            multiplayer_menu(username)
         end
       end
     end
@@ -212,7 +212,7 @@ defmodule Trivia.CLI do
     case IO.gets("Seleccione: ") |> String.trim() do
       "1" ->
         Trivia.Lobby.start_game(id)
-        IO.puts("🚀 Partida iniciada!")
+        IO.puts("🚀 Partida iniciada! Espera las preguntas...\n")
         listen_multiplayer()
       "2" ->
         Trivia.Lobby.cancel_game(id)
@@ -230,6 +230,7 @@ defmodule Trivia.CLI do
       "1" ->
         Trivia.Lobby.leave_game(id, username)
         IO.puts("🚪 Saliste de la partida.")
+        multiplayer_menu()
       _ ->
         guest_lobby_menu(id, username)
     end
@@ -239,8 +240,10 @@ defmodule Trivia.CLI do
   # PARTIDA INDIVIDUAL
   # ===============================
   defp start_single_game(username) do
-    IO.puts("\n=== 🎯 Configura tu partida ===\n")
+    IO.puts("\n=== 🎯 Configuración de partida individual ===\n")
+
     categories = QuestionBank.load_categories()
+
     if categories == [] do
       IO.puts("⚠️ No hay categorías disponibles.\n")
       main_menu(username)
@@ -248,12 +251,25 @@ defmodule Trivia.CLI do
       Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
         IO.puts("#{i}. #{String.capitalize(cat)}")
       end)
+
       category = seleccionar_opcion(categories)
-      num = pedir_numero("¿Cuántas preguntas deseas?", 3)
-      time = pedir_numero("Tiempo por pregunta (segundos)?", 10)
-      case Server.start_game(%{username: username, category: category, num: num, time: time, mode: :single}) do
-        {:ok, pid} -> play_game(pid, username)
-        {:error, reason} -> IO.puts("❌ No se pudo iniciar el juego: #{inspect(reason)}")
+      num = pedir_numero("Número de preguntas:", 3)
+      time = pedir_numero("Tiempo por pregunta (segundos):", 10)
+
+      case Server.start_game(%{
+            username: username,
+            category: category,
+            num: num,
+            time: time,
+            mode: :single
+          }) do
+        {:ok, pid} ->
+          IO.puts("✅ Partida iniciada correctamente!\n")
+          play_game(pid, username)
+
+        {:error, reason} ->
+          IO.puts("❌ No se pudo iniciar el juego: #{inspect(reason)}")
+          main_menu(username)
       end
     end
   end
@@ -264,7 +280,7 @@ defmodule Trivia.CLI do
         IO.puts("\n#{question}")
         Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
         answer = IO.gets("\nTu respuesta (a, b, c, d): ") |> String.trim() |> String.downcase()
-        Game.answer(pid, username, answer)
+        Game.answer(pid, answer)
         play_game(pid, username)
       {:game_over, score} ->
         IO.puts("\n🏁 Fin de la partida. Puntaje total: #{score}\n")
