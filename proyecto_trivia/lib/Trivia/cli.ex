@@ -217,7 +217,7 @@ defmodule Trivia.CLI do
       "2" ->
         Trivia.Lobby.cancel_game(id)
         IO.puts("❌ Partida cancelada.\n")
-        multiplayer_menu(username)
+        :ok
       _ -> host_lobby_menu(id, username)
     end
   end
@@ -225,7 +225,7 @@ defmodule Trivia.CLI do
   defp guest_lobby_menu(id, username) do
     IO.puts("\n=== 🕒 Esperando inicio de partida #{id} ===")
     IO.puts("1. Salir de la partida")
-    spawn(fn -> listen_multiplayer() end)
+    listen_multiplayer()
     case IO.gets("Seleccione: ") |> String.trim() do
       "1" ->
         Trivia.Lobby.leave_game(id, username)
@@ -361,7 +361,7 @@ defmodule Trivia.CLI do
         IO.puts("\n📢 #{msg}")
         listen_multiplayer()
     after
-      300_000 -> IO.puts("\n⏰ Desconectado por inactividad.")
+      180_000 -> IO.puts("\n⏰ Desconectado por inactividad.")
     end
   end
 end
