@@ -13,8 +13,9 @@ defmodule Trivia.CLI do
   def start_server do
     {:ok, _session} = ensure_session_manager_started()
     {:ok, _server} = ensure_server_started()
-    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA ===\n")
-    multiplayer_menu()
+    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA INICIADO ===\n")
+    IO.puts("Esperando jugadores remotos...\n")
+    Process.sleep(:infinity)
   end
 
   # ===============================
