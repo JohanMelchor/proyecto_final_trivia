@@ -282,8 +282,8 @@ defmodule Trivia.CLI do
 
     case UserManager.register_or_login(username, password) do
       {:ok, user} ->
-        IO.puts("\n✅ Bienvenido #{user["username"]}! — MODO INDIVIDUAL\n")
-        start_single_game(user["username"])
+        IO.puts("\n✅ Bienvenido #{user["username"]}!\n")
+        main_menu()  # o mostrar menú de modos
 
       {:error, reason} ->
         IO.puts("\n❌ Error: #{inspect(reason)}\n")
