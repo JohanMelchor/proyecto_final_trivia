@@ -98,13 +98,19 @@ defmodule Trivia.Game do
 
   def handle_info(:next_question, %{mode: :single, questions: [q | rest]} = state) do
     if state.caller, do: send(state.caller, {:question, q["question"], q["options"]})
-    ref = Process.send_after(self(), :timeout, state.time * 1000)
-    {:noreply, %{state | questions: rest, current: q, timer_ref: ref}}
+    # Cancelar temporizador anterior si existe
+    if state[:timer_ref], do: Process.cancel_timer(state.timer_ref)
+    # Iniciar nuevo temporizador
+    timer_ref = Process.send_after(self(), :timeout, state.time * 1000)
+    {:noreply, %{state | questions: rest, current: q, timer_ref: timer_ref}}
   end
 
   def handle_info(:timeout, %{mode: :single} = state) do
-    IO.puts("\n⏰ Tiempo agotado. -5 puntos.")
-    Process.send_after(self(), :next_question, 1000)
+    # Avisar al jugador (cliente) que se agotó el tiempo
+    if state.caller, do: send(state.caller, {:timeout_notice})
+
+    # Cancelar timer anterior y pasar a la siguiente pregunta
+    Process.send_after(self(), :next_question, 1500)
     {:noreply, %{state | score: state.score - 5, current: nil, timer_ref: nil}}
   end
 
@@ -135,10 +141,14 @@ defmodule Trivia.Game do
   end
 
   def handle_cast({:answer, answer}, %{mode: :single, current: q} = state) do
+    if state[:timer_ref], do: Process.cancel_timer(state.timer_ref)
+
     correct = String.downcase(answer) == String.downcase(q["answer"])
     delta = if correct, do: 5, else: -2
-    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+
+    if state.caller, do: send(state.caller, {:feedback, correct, delta})
+
     Process.send_after(self(), :next_question, 1500)
-    {:noreply, %{state | score: state.score + delta, current: nil, timer_ref: nil}}
+    {:noreply, %{state | score: state.score + delta, timer_ref: nil}}
   end
 end

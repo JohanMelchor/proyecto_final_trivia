@@ -282,10 +282,21 @@ defmodule Trivia.CLI do
         answer = IO.gets("\nTu respuesta (a, b, c, d): ") |> String.trim() |> String.downcase()
         Game.answer(pid, answer)
         play_game(pid, username)
+
+      {:feedback, correct, delta} ->
+        IO.puts(if correct, do: "✅ Correcto! (+#{delta})", else: "❌ Incorrecto (#{delta})")
+        play_game(pid, username)
+
       {:game_over, score} ->
-        IO.puts("\n🏁 Fin de la partida. Puntaje total: #{score}\n")
+        IO.puts("\n🏁 Fin de la partida. Puntaje total: #{score}")
+        IO.puts("=====================================\n")
+        main_menu(username)
+
+      {:timeout_notice} ->
+        IO.puts("\n⏰ Tiempo agotado. Pasando a la siguiente pregunta...")
+        play_game(pid, username)
     after
-      30_000 -> IO.puts("\n⏰ Tiempo excedido, partida cerrada.")
+      60_000 -> IO.puts("\n⏰ Tiempo excedido, partida cerrada.")
     end
   end
 
