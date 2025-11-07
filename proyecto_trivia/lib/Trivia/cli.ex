@@ -230,7 +230,7 @@ defmodule Trivia.CLI do
       "1" ->
         Trivia.Lobby.leave_game(id, username)
         IO.puts("🚪 Saliste de la partida.")
-        multiplayer_menu()
+        multiplayer_menu(username)
       _ ->
         guest_lobby_menu(id, username)
     end

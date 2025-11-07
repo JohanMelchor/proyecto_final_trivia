@@ -11,12 +11,12 @@ defmodule Trivia.UserManager do
   # ---------- API pública ----------
 
   @doc """
-  Registra o inicia sesión de un usuario.
-  Si el usuario no existe, se crea.
-  Si ya existe, valida la contraseña.
+  Registra un nuevo usuario.
+  Si el usuario ya existe, devuelve error.
   """
   def register(username, password) do
     users = load_users()
+
     if Enum.any?(users, &(&1["username"] == username)) do
       {:error, "Usuario ya existe"}
     else
@@ -26,14 +26,20 @@ defmodule Trivia.UserManager do
     end
   end
 
+  @doc """
+  Inicia sesión de un usuario ya registrado.
+  """
   def login(username, password) do
     users = load_users()
+
     case Enum.find(users, &(&1["username"] == username && &1["password"] == password)) do
       nil -> {:error, "Usuario o contraseña incorrectos"}
       user -> {:ok, user}
     end
   end
 
+  # ✅ Alias semántico usado por SessionManager
+  def authenticate(username, password), do: login(username, password)
 
   @doc """
   Devuelve el puntaje acumulado de un usuario.
@@ -86,5 +92,4 @@ defmodule Trivia.UserManager do
     json = Jason.encode!(users, pretty: true)
     File.write!(@file_path, json)
   end
-
 end
