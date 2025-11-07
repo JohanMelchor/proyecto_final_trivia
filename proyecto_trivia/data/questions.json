@@ -1,25 +1,763 @@
 {
-  "ciencia": [
+  "geografia": [
     {
-      "question": "¿Cuál es el planeta más grande del sistema solar?",
-      "options": { "a": "Tierra", "b": "Júpiter", "c": "Saturno", "d": "Marte" },
+      "question": "¿Cuál es el río más largo del mundo?",
+      "options": { "a": "Nilo", "b": "Amazonas", "c": "Misisipi", "d": "Yangtsé" },
       "answer": "b"
     },
     {
-      "question": "¿Qué gas respiran los seres humanos?",
+      "question": "¿Qué montaña es la más alta del mundo?",
+      "options": { "a": "K2", "b": "Monte Everest", "c": "Aconcagua", "d": "Kilimanjaro" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el país más grande del mundo por área?",
+      "options": { "a": "China", "b": "Estados Unidos", "c": "Rusia", "d": "Canadá" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Cuál es el país más pequeño del mundo?",
+      "options": { "a": "Mónaco", "b": "Vaticano", "c": "San Marino", "d": "Liechtenstein" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el océano más grande?",
+      "options": { "a": "Atlántico", "b": "Índico", "c": "Ártico", "d": "Pacífico" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué desierto es el más grande del mundo?",
+      "options": { "a": "Sahara", "b": "Antártida", "c": "Gobi", "d": "Kalahari" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es la capital de Australia?",
+      "options": { "a": "Sídney", "b": "Melbourne", "c": "Canberra", "d": "Brisbane" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué país tiene la mayor población?",
+      "options": { "a": "India", "b": "China", "c": "Estados Unidos", "d": "Indonesia" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el lago más profundo del mundo?",
+      "options": { "a": "Lago Superior", "b": "Lago Baikal", "c": "Lago Tanganica", "d": "Lago Victoria" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué cordillera separa Europa de Asia?",
+      "options": { "a": "Alpes", "b": "Urales", "c": "Cáucaso", "d": "Himalaya" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es la capital de Canadá?",
+      "options": { "a": "Toronto", "b": "Vancouver", "c": "Ottawa", "d": "Montreal" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué país es conocido como la 'Tierra del Sol Naciente'?",
+      "options": { "a": "China", "b": "Corea del Sur", "c": "Japón", "d": "Tailandia" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué continente se encuentra Egipto?",
+      "options": { "a": "Asia", "b": "África", "c": "Europa", "d": "América" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el país con más islas del mundo?",
+      "options": { "a": "Filipinas", "b": "Indonesia", "c": "Suecia", "d": "Grecia" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué ciudad es la más poblada del mundo?",
+      "options": { "a": "Nueva York", "b": "Tokio", "c": "Shanghai", "d": "Delhi" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el volcán más alto de América?",
+      "options": { "a": "Monte Saint Helens", "b": "Popocatépetl", "c": "Ojos del Salado", "d": "Cotopaxi" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué país no tiene costa marítima?",
+      "options": { "a": "Bolivia", "b": "Paraguay", "c": "Suiza", "d": "Todos los anteriores" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Cuál es la capital de Brasil?",
+      "options": { "a": "São Paulo", "b": "Río de Janeiro", "c": "Brasilia", "d": "Salvador" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué mar es el más salado?",
+      "options": { "a": "Mar Muerto", "b": "Mar Rojo", "c": "Mar Mediterráneo", "d": "Mar Caspio" },
+      "answer": "a"
+    },
+    {
+      "question": "¿En qué país se encuentra el Kilimanjaro?",
+      "options": { "a": "Kenia", "b": "Tanzania", "c": "Uganda", "d": "Etiopía" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el país más densamente poblado?",
+      "options": { "a": "Mónaco", "b": "Singapur", "c": "Bangladesh", "d": "Malta" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué río pasa por París?",
+      "options": { "a": "Támesis", "b": "Sena", "c": "Rin", "d": "Danubio" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el país con mayor número de países fronterizos?",
+      "options": { "a": "Rusia", "b": "China", "c": "Brasil", "d": "Alemania" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué continente tiene el mayor número de países?",
+      "options": { "a": "Asia", "b": "América", "c": "África", "d": "Europa" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Cuál es la cascada más alta del mundo?",
+      "options": { "a": "Cataratas del Niágara", "b": "Cataratas Victoria", "c": "Salto del Ángel", "d": "Iguazú" },
+      "answer": "c"
+    }
+  ],
+  "historia": [
+    {
+      "question": "¿En qué año Cristóbal Colón llegó a América?",
+      "options": { "a": "1492", "b": "1502", "c": "1488", "d": "1510" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué civilización construyó Machu Picchu?",
+      "options": { "a": "Aztecas", "b": "Mayas", "c": "Incas", "d": "Olmecas" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién fue el primer presidente de Estados Unidos?",
+      "options": { "a": "Thomas Jefferson", "b": "Abraham Lincoln", "c": "George Washington", "d": "John Adams" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué año cayó el Imperio Romano de Occidente?",
+      "options": { "a": "476 d.C.", "b": "312 d.C.", "c": "600 d.C.", "d": "410 d.C." },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué filósofo griego fue maestro de Alejandro Magno?",
+      "options": { "a": "Sócrates", "b": "Platón", "c": "Aristóteles", "d": "Pitágoras" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué revolucionario lideró la lucha por la independencia de México?",
+      "options": { "a": "Simón Bolívar", "b": "José de San Martín", "c": "Miguel Hidalgo", "d": "José María Morelos" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué siglo ocurrió la Revolución Francesa?",
+      "options": { "a": "XVII", "b": "XVIII", "c": "XIX", "d": "XVI" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué emperador romano convirtió el cristianismo en religión oficial?",
+      "options": { "a": "Constantino", "b": "Julio César", "c": "Nerón", "d": "Trajano" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué país inició la Primera Guerra Mundial?",
+      "options": { "a": "Alemania", "b": "Francia", "c": "Austria-Hungría", "d": "Rusia" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién escribió 'El Príncipe'?",
+      "options": { "a": "Maquiavelo", "b": "Voltaire", "c": "Rousseau", "d": "Montesquieu" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué dinastía gobernó China durante más tiempo?",
+      "options": { "a": "Ming", "b": "Qing", "c": "Zhou", "d": "Han" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué año se firmó la Declaración de Independencia de Estados Unidos?",
+      "options": { "a": "1776", "b": "1789", "c": "1765", "d": "1801" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué faraón egipcio fue encontrado en su tumba intacta en 1922?",
+      "options": { "a": "Ramsés II", "b": "Cleopatra", "c": "Tutankamón", "d": "Akenatón" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué imperio dominó Mesoamérica antes de la llegada de los españoles?",
+      "options": { "a": "Inca", "b": "Azteca", "c": "Maya", "d": "Tolteca" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Quién lideró la Revolución Rusa de 1917?",
+      "options": { "a": "Stalin", "b": "Lenin", "c": "Trotsky", "d": "Marx" },
+      "answer": "b"
+    },
+    {
+      "question": "¿En qué año cayó el Muro de Berlín?",
+      "options": { "a": "1987", "b": "1991", "c": "1989", "d": "1985" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué civilización antigua desarrolló la democracia?",
+      "options": { "a": "Roma", "b": "Egipto", "c": "Grecia", "d": "Persia" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién fue el primer emperador de Roma?",
+      "options": { "a": "Julio César", "b": "Augusto", "c": "Marco Antonio", "d": "Nerón" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué explorador portugués llegó a la India por mar?",
+      "options": { "a": "Cristóbal Colón", "b": "Fernando de Magallanes", "c": "Vasco da Gama", "d": "Bartolomeu Dias" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué año comenzó la Guerra Civil Española?",
+      "options": { "a": "1936", "b": "1939", "c": "1941", "d": "1928" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué reina inglesa reinó durante 63 años?",
+      "options": { "a": "Isabel I", "b": "Victoria", "c": "Isabel II", "d": "María I" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué batalla marcó el fin de Napoleón Bonaparte?",
+      "options": { "a": "Waterloo", "b": "Austerlitz", "c": "Trafalgar", "d": "Borodino" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué imperio fue conocido como 'el imperio donde nunca se pone el sol'?",
+      "options": { "a": "Británico", "b": "Español", "c": "Romano", "d": "Otomano" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Quién fue el último zar de Rusia?",
+      "options": { "a": "Pedro el Grande", "b": "Alejandro II", "c": "Nicolás II", "d": "Iván el Terrible" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué año se descubrió la tumba de Tutankamón?",
+      "options": { "a": "1912", "b": "1922", "c": "1930", "d": "1908" },
+      "answer": "b"
+    }
+  ],
+  "ciencia": [
+    {
+      "question": "¿Cuál es el elemento químico más abundante en el universo?",
+      "options": { "a": "Oxígeno", "b": "Carbono", "c": "Hierro", "d": "Hidrógeno" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué partícula subatómica tiene carga negativa?",
+      "options": { "a": "Protón", "b": "Neutrón", "c": "Electrón", "d": "Positrón" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué científico formuló la teoría de la relatividad?",
+      "options": { "a": "Isaac Newton", "b": "Albert Einstein", "c": "Stephen Hawking", "d": "Niels Bohr" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es la velocidad de la luz en el vacío?",
+      "options": { "a": "300,000 km/s", "b": "150,000 km/s", "c": "500,000 km/s", "d": "1,000,000 km/s" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué planeta es conocido como el 'planeta rojo'?",
+      "options": { "a": "Venus", "b": "Júpiter", "c": "Marte", "d": "Saturno" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué gas es el principal responsable del efecto invernadero?",
+      "options": { "a": "Oxígeno", "b": "Nitrógeno", "c": "Dióxido de carbono", "d": "Helio" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué tipo de sangre es el donante universal?",
+      "options": { "a": "A+", "b": "B-", "c": "AB+", "d": "O-" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué organelo es conocido como la 'central energética' de la célula?",
+      "options": { "a": "Núcleo", "b": "Mitocondria", "c": "Ribosoma", "d": "Cloroplasto" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué científico descubrió la penicilina?",
+      "options": { "a": "Marie Curie", "b": "Alexander Fleming", "c": "Louis Pasteur", "d": "Robert Koch" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el hueso más largo del cuerpo humano?",
+      "options": { "a": "Tibia", "b": "Peroné", "c": "Húmero", "d": "Fémur" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué planeta tiene anillos visibles desde la Tierra?",
+      "options": { "a": "Júpiter", "b": "Saturno", "c": "Urano", "d": "Neptuno" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué vitamina se produce cuando la piel se expone al sol?",
+      "options": { "a": "Vitamina A", "b": "Vitamina C", "c": "Vitamina D", "d": "Vitamina K" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué fuerza mantiene a los planetas en órbita alrededor del Sol?",
+      "options": { "a": "Electromagnetismo", "b": "Gravedad", "c": "Fuerza nuclear fuerte", "d": "Fuerza nuclear débil" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué gas utilizan las plantas para la fotosíntesis?",
+      "options": { "a": "Oxígeno", "b": "Nitrógeno", "c": "Dióxido de carbono", "d": "Hidrógeno" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué científico propuso la teoría de la evolución por selección natural?",
+      "options": { "a": "Charles Darwin", "b": "Gregor Mendel", "c": "Alfred Wallace", "d": "Jean-Baptiste Lamarck" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué planeta es el más cercano al Sol?",
+      "options": { "a": "Venus", "b": "Mercurio", "c": "Tierra", "d": "Marte" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué elemento tiene el símbolo químico 'Au'?",
+      "options": { "a": "Plata", "b": "Oro", "c": "Aluminio", "d": "Argón" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué tipo de sangre es el receptor universal?",
+      "options": { "a": "O-", "b": "A+", "c": "B-", "d": "AB+" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué planeta tiene la mayor luna del sistema solar?",
+      "options": { "a": "Tierra", "b": "Júpiter", "c": "Saturno", "d": "Neptuno" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué gas emiten las plantas durante la fotosíntesis?",
+      "options": { "a": "Dióxido de carbono", "b": "Oxígeno", "c": "Nitrógeno", "d": "Hidrógeno" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué partícula subatómica se encuentra en el núcleo atómico?",
+      "options": { "a": "Electrón", "b": "Protón y neutrón", "c": "Fotón", "d": "Positrón" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué planeta tiene el día más largo del sistema solar?",
+      "options": { "a": "Venus", "b": "Júpiter", "c": "Mercurio", "d": "Marte" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué enfermedad es causada por la deficiencia de vitamina C?",
+      "options": { "a": "Raquitismo", "b": "Escorbuto", "c": "Anemia", "d": "Beri-beri" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué científico formuló las tres leyes del movimiento?",
+      "options": { "a": "Galileo Galilei", "b": "Albert Einstein", "c": "Isaac Newton", "d": "Johannes Kepler" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué gas es esencial para la respiración de los seres humanos?",
       "options": { "a": "Nitrógeno", "b": "Oxígeno", "c": "Dióxido de carbono", "d": "Helio" },
       "answer": "b"
     }
   ],
-  "programacion": [
+  "entretenimiento": [
     {
-      "question": "¿Qué lenguaje se ejecuta en la máquina virtual BEAM?",
-      "options": { "a": "Python", "b": "Erlang", "c": "Elixir", "d": "Rust" },
+      "question": "¿Qué actor interpretó a Jack Dawson en 'Titanic'?",
+      "options": { "a": "Brad Pitt", "b": "Johnny Depp", "c": "Leonardo DiCaprio", "d": "Tom Cruise" },
       "answer": "c"
     },
     {
-      "question": "¿Qué palabra clave define una función en Elixir?",
-      "options": { "a": "function", "b": "fn", "c": "def", "d": "lambda" },
+      "question": "¿Qué serie de HBO está basada en las novelas de George R.R. Martin?",
+      "options": { "a": "The Sopranos", "b": "Game of Thrones", "c": "Westworld", "d": "The Wire" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué cantante es conocida como 'La Reina del Pop'?",
+      "options": { "a": "Beyoncé", "b": "Madonna", "c": "Lady Gaga", "d": "Rihanna" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué película ganó el Oscar a Mejor Película en 2020?",
+      "options": { "a": "Parasite", "b": "1917", "c": "Joker", "d": "Once Upon a Time in Hollywood" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué plataforma streaming es famosa por su logo rojo?",
+      "options": { "a": "Disney+", "b": "Amazon Prime", "c": "Netflix", "d": "HBO Max" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué banda británica es conocida como 'Los Fab Four'?",
+      "options": { "a": "The Rolling Stones", "b": "The Beatles", "c": "Queen", "d": "Led Zeppelin" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué actor interpreta a Iron Man en el Universo Cinematográfico de Marvel?",
+      "options": { "a": "Chris Evans", "b": "Robert Downey Jr.", "c": "Chris Hemsworth", "d": "Mark Ruffalo" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué videojuego presenta a los personajes Mario y Luigi?",
+      "options": { "a": "The Legend of Zelda", "b": "Sonic the Hedgehog", "c": "Super Mario Bros.", "d": "Donkey Kong" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué película de Disney está basada en la historia de 'La Cenicienta'?",
+      "options": { "a": "Frozen", "b": "Moana", "c": "Encanto", "d": "Cinderella" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué cantante colombiano es conocido por éxitos como 'Despacito'?",
+      "options": { "a": "Maluma", "b": "J Balvin", "c": "Luis Fonsi", "d": "Shakira" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué serie de Netflix trata sobre un mundo distópico con números?",
+      "options": { "a": "The Crown", "b": "Stranger Things", "c": "Squid Game", "d": "Bridgerton" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué película de superhéroes presenta el personaje de Black Panther?",
+      "options": { "a": "Avengers: Endgame", "b": "Black Panther", "c": "Captain America: Civil War", "d": "Thor: Ragnarok" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué artista pintó 'La noche estrellada'?",
+      "options": { "a": "Pablo Picasso", "b": "Vincent van Gogh", "c": "Claude Monet", "d": "Salvador Dalí" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué grupo musical tuvo un éxito con 'Bohemian Rhapsody'?",
+      "options": { "a": "The Beatles", "b": "Queen", "c": "Led Zeppelin", "d": "Pink Floyd" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué director de cine dirigió 'El Padrino'?",
+      "options": { "a": "Martin Scorsese", "b": "Steven Spielberg", "c": "Francis Ford Coppola", "d": "Alfred Hitchcock" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué serie de televisión trata sobre un profesor de química que se convierte en narcotraficante?",
+      "options": { "a": "Better Call Saul", "b": "Narcos", "c": "Breaking Bad", "d": "Ozark" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué cantante es conocida como 'La Reina del Soul'?",
+      "options": { "a": "Aretha Franklin", "b": "Whitney Houston", "c": "Tina Turner", "d": "Diana Ross" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué película de animación de Pixar tiene como personaje principal a un robot llamado WALL-E?",
+      "options": { "a": "Cars", "b": "Ratatouille", "c": "WALL-E", "d": "Up" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué actor interpreta a John Wick en la franquicia cinematográfica?",
+      "options": { "a": "Jason Statham", "b": "Keanu Reeves", "c": "Bruce Willis", "d": "Liam Neeson" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué videojuego de construcción es conocido por sus bloques pixelados?",
+      "options": { "a": "Fortnite", "b": "Roblox", "c": "Minecraft", "d": "Terraria" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué película musical tiene como protagonista a un estudiante de la escuela Rydell High?",
+      "options": { "a": "The Sound of Music", "b": "Mamma Mia!", "c": "La La Land", "d": "Grease" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué serie animada adulta trata sobre la familia Smith y su alienígena?",
+      "options": { "a": "Family Guy", "b": "South Park", "c": "American Dad!", "d": "Rick and Morty" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué cantante británico es conocido como 'El Rey del Pop'?",
+      "options": { "a": "Elton John", "b": "Michael Jackson", "c": "Prince", "d": "David Bowie" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué película de Christopher Nolan trata sobre los sueños y la realidad?",
+      "options": { "a": "The Dark Knight", "b": "Inception", "c": "Interstellar", "d": "Memento" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué serie de comedia trata sobre un grupo de amigos en Central Perk?",
+      "options": { "a": "How I Met Your Mother", "b": "The Big Bang Theory", "c": "Friends", "d": "Seinfeld" },
+      "answer": "c"
+    }
+  ],
+  "deportes": [
+    {
+      "question": "¿Cuál es el deporte más popular del mundo?",
+      "options": { "a": "Baloncesto", "b": "Fútbol", "c": "Críquet", "d": "Tenis" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué país ganó el último Mundial de Fútbol 2022?",
+      "options": { "a": "Francia", "b": "Brasil", "c": "Argentina", "d": "España" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Cuántos jugadores hay en un equipo de fútbol en el campo?",
+      "options": { "a": "10", "b": "11", "c": "12", "d": "9" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué nadador tiene más medallas olímpicas de oro?",
+      "options": { "a": "Mark Spitz", "b": "Michael Phelps", "c": "Ian Thorpe", "d": "Ryan Lochte" },
+      "answer": "b"
+    },
+    {
+      "question": "¿En qué deporte se utiliza una raqueta y una pelota amarilla?",
+      "options": { "a": "Golf", "b": "Tenis", "c": "Bádminton", "d": "Pádel" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué país ha ganado más Copas del Mundo de fútbol?",
+      "options": { "a": "Alemania", "b": "Italia", "c": "Argentina", "d": "Brasil" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Cuántos cuartos tiene un partido de baloncesto NBA?",
+      "options": { "a": "2", "b": "3", "c": "4", "d": "5" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué deporte practica Rafael Nadal?",
+      "options": { "a": "Golf", "b": "Fútbol", "c": "Tenis", "d": "Pádel" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué ciudad se celebraron los Juegos Olímpicos de 2016?",
+      "options": { "a": "Tokio", "b": "Londres", "c": "Río de Janeiro", "d": "Pekín" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué boxeador fue conocido como 'The Greatest'?",
+      "options": { "a": "Mike Tyson", "b": "Muhammad Ali", "c": "Floyd Mayweather", "d": "Sugar Ray Leonard" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es la distancia de un maratón completo?",
+      "options": { "a": "21.097 km", "b": "42.195 km", "c": "10 km", "d": "50 km" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué país es el creador del baloncesto?",
+      "options": { "a": "Canadá", "b": "Estados Unidos", "c": "Inglaterra", "d": "Francia" },
+      "answer": "b"
+    },
+    {
+      "question": "¿En qué deporte se anotan 'home runs'?",
+      "options": { "a": "Fútbol americano", "b": "Rugby", "c": "Béisbol", "d": "Críquet" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué tenista tiene más títulos de Grand Slam?",
+      "options": { "a": "Rafael Nadal", "b": "Novak Djokovic", "c": "Roger Federer", "d": "Andy Murray" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuántos jugadores hay en un equipo de baloncesto en la cancha?",
+      "options": { "a": "6", "b": "5", "c": "7", "d": "4" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué país organizó el primer Mundial de Fútbol en 1930?",
+      "options": { "a": "Brasil", "b": "Uruguay", "c": "Italia", "d": "Francia" },
+      "answer": "b"
+    },
+    {
+      "question": "¿En qué deporte se usa un 'birdie'?",
+      "options": { "a": "Golf", "b": "Bádminton", "c": "Tenis", "d": "Voleibol" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué nadador estadounidense ganó 8 oros en Beijing 2008?",
+      "options": { "a": "Ryan Lochte", "b": "Michael Phelps", "c": "Mark Spitz", "d": "Caeleb Dressel" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuál es el torneo de tenis más antiguo del mundo?",
+      "options": { "a": "US Open", "b": "Roland Garros", "c": "Australian Open", "d": "Wimbledon" },
+      "answer": "d"
+    },
+    {
+      "question": "¿Qué deporte incluye los términos 'spare' y 'strike'?",
+      "options": { "a": "Golf", "b": "Boliche", "c": "Béisbol", "d": "Hockey" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué equipo de la NFL tiene más títulos de Super Bowl?",
+      "options": { "a": "Dallas Cowboys", "b": "New England Patriots", "c": "Pittsburgh Steelers", "d": "San Francisco 49ers" },
+      "answer": "c"
+    },
+    {
+      "question": "¿En qué año se celebraron los primeros Juegos Olímpicos modernos?",
+      "options": { "a": "1900", "b": "1924", "c": "1896", "d": "1912" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué país ha ganado más medallas olímpicas en la historia?",
+      "options": { "a": "China", "b": "Rusia", "c": "Estados Unidos", "d": "Alemania" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué deporte practicaba Tiger Woods?",
+      "options": { "a": "Tenis", "b": "Golf", "c": "Fútbol", "d": "Béisbol" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Cuántos sets se necesitan para ganar un partido de tenis masculino en Grand Slam?",
+      "options": { "a": "2", "b": "3", "c": "4", "d": "5" },
+      "answer": "b"
+    }
+  ],
+  "arte": [
+    {
+      "question": "¿Quién pintó 'La Gioconda' o 'Mona Lisa'?",
+      "options": { "a": "Miguel Ángel", "b": "Leonardo da Vinci", "c": "Rafael", "d": "Donatello" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué movimiento artístico lideraba Salvador Dalí?",
+      "options": { "a": "Impresionismo", "b": "Surrealismo", "c": "Cubismo", "d": "Expresionismo" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Quién esculpió el 'David'?",
+      "options": { "a": "Donatello", "b": "Miguel Ángel", "c": "Bernini", "d": "Rodin" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué artista cortó parte de su propia oreja?",
+      "options": { "a": "Pablo Picasso", "b": "Vincent van Gogh", "c": "Claude Monet", "d": "Edvard Munch" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué pintor español es conocido por su 'periodo azul'?",
+      "options": { "a": "Salvador Dalí", "b": "Francisco de Goya", "c": "Pablo Picasso", "d": "Joan Miró" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Dónde se encuentra la Capilla Sixtina?",
+      "options": { "a": "París", "b": "Florencia", "c": "Roma", "d": "Venecia" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué artista pintó 'El grito'?",
+      "options": { "a": "Vincent van Gogh", "b": "Edvard Munch", "c": "Paul Gauguin", "d": "Henri Matisse" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué estilo arquitectónico se caracteriza por arcos apuntados y vitrales?",
+      "options": { "a": "Románico", "b": "Renacimiento", "c": "Gótico", "d": "Barroco" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién pintó 'Las meninas'?",
+      "options": { "a": "El Greco", "b": "Francisco de Goya", "c": "Diego Velázquez", "d": "Bartolomé Esteban Murillo" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué movimiento artístico se caracteriza por pintar 'en plein air' (al aire libre)?",
+      "options": { "a": "Cubismo", "b": "Impresionismo", "c": "Surrealismo", "d": "Realismo" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué artista mexicana es conocida por sus autorretratos con cejas pobladas?",
+      "options": { "a": "María Izquierdo", "b": "Frida Kahlo", "c": "Remedios Varo", "d": "Leonora Carrington" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué escultor francés es conocido por 'El pensador'?",
+      "options": { "a": "Auguste Rodin", "b": "Antoine Bourdelle", "c": "Jean-Baptiste Carpeaux", "d": "Aristide Maillol" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué pintor holandés es famoso por 'La ronda de noche'?",
+      "options": { "a": "Johannes Vermeer", "b": "Rembrandt", "c": "Frans Hals", "d": "Pieter de Hooch" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué estilo artístico se caracteriza por formas geométricas y perspectiva múltiple?",
+      "options": { "a": "Impresionismo", "b": "Expresionismo", "c": "Cubismo", "d": "Fauvismo" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién diseñó la famosa 'Fuente de Trevi' en Roma?",
+      "options": { "a": "Gian Lorenzo Bernini", "b": "Nicola Salvi", "c": "Francesco Borromini", "d": "Michelangelo" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué artista italiano es conocido como 'el pintor de las madonnas'?",
+      "options": { "a": "Leonardo da Vinci", "b": "Rafael", "c": "Tiziano", "d": "Caravaggio" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué museo parisino alberga 'La Venus de Milo'?",
+      "options": { "a": "Museo de Orsay", "b": "Museo del Louvre", "c": "Centro Pompidou", "d": "Museo Rodin" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué pintor francés es líder del movimiento fauvista?",
+      "options": { "a": "Paul Cézanne", "b": "Claude Monet", "c": "Henri Matisse", "d": "Pierre-Auguste Renoir" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué arquitecto español diseñó la Sagrada Familia?",
+      "options": { "a": "Santiago Calatrava", "b": "Ricardo Bofill", "c": "Antoni Gaudí", "d": "Rafael Moneo" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué artista pop pintó 'Latas de sopa Campbell'?",
+      "options": { "a": "Roy Lichtenstein", "b": "Andy Warhol", "c": "Keith Haring", "d": "Robert Rauschenberg" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué pintor barroco es conocido por su uso dramático de la luz y sombra?",
+      "options": { "a": "Caravaggio", "b": "Rubens", "c": "Rembrandt", "d": "Velázquez" },
+      "answer": "a"
+    },
+    {
+      "question": "¿Qué movimiento artístico buscaba representar los sueños y el subconsciente?",
+      "options": { "a": "Realismo", "b": "Impresionismo", "c": "Surrealismo", "d": "Expresionismo" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Quién pintó 'El jardín de las delicias'?",
+      "options": { "a": "Pieter Brueghel el Viejo", "b": "El Bosco", "c": "Jan van Eyck", "d": "Alberto Durero" },
+      "answer": "b"
+    },
+    {
+      "question": "¿Qué escultor griego esculpió el 'Discóbolo'?",
+      "options": { "a": "Fidias", "b": "Praxiteles", "c": "Mirón", "d": "Lisipo" },
+      "answer": "c"
+    },
+    {
+      "question": "¿Qué artista japonés es famoso por 'La gran ola de Kanagawa'?",
+      "options": { "a": "Utamaro", "b": "Hiroshige", "c": "Hokusai", "d": "Sharaku" },
       "answer": "c"
     }
   ]
