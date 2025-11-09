@@ -277,26 +277,72 @@ defmodule Trivia.CLI do
   defp play_game(pid, username) do
     receive do
       {:question, question, options} ->
-        IO.puts("\n#{question}")
+        IO.puts("\n" <> String.duplicate("=", 50))
+        IO.puts("❓ #{question}")
+        IO.puts(String.duplicate("-", 50))
         Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
-        answer = IO.gets("\nTu respuesta (a, b, c, d): ") |> String.trim() |> String.downcase()
-        Game.answer(pid, answer)
+        IO.puts(String.duplicate("=", 50))
+
+        # Pedir respuesta en un proceso separado para no bloquear
+        spawn(fn ->
+          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
+                  |> String.trim()
+                  |> String.downcase()
+
+          # Validar respuesta
+          if answer in ["a", "b", "c", "d"] do
+            Game.answer(pid, answer)
+          else
+            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+            # Reintentar
+            send(self(), {:retry_question, pid})
+          end
+        end)
+
+        play_game(pid, username)
+
+      {:retry_question, pid} ->
+        # Volver a pedir respuesta para la misma pregunta
+        spawn(fn ->
+          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
+                  |> String.trim()
+                  |> String.downcase()
+
+          if answer in ["a", "b", "c", "d"] do
+            Game.answer(pid, answer)
+          else
+            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+            send(self(), {:retry_question, pid})
+          end
+        end)
+
         play_game(pid, username)
 
       {:feedback, correct, delta} ->
-        IO.puts(if correct, do: "✅ Correcto! (+#{delta})", else: "❌ Incorrecto (#{delta})")
+        # Este mensaje ahora es informativo, ya mostramos el feedback en game.ex
+        play_game(pid, username)
+
+      {:timeout_notice, correct_answer} ->
+        IO.puts("\n⏰ Tiempo agotado! La respuesta correcta era: #{correct_answer}")
+        IO.puts("🔄 Pasando a la siguiente pregunta...")
         play_game(pid, username)
 
       {:game_over, score} ->
-        IO.puts("\n🏁 Fin de la partida. Puntaje total: #{score}")
-        IO.puts("=====================================\n")
+        IO.puts("\n" <> String.duplicate("🎉", 20))
+        IO.puts("🏁 ¡FIN DEL JUEGO!")
+        IO.puts("📊 Puntaje final: #{score} puntos")
+        IO.puts(String.duplicate("🎉", 20))
+        IO.puts("\n")
         main_menu(username)
 
-      {:timeout_notice} ->
-        IO.puts("\n⏰ Tiempo agotado. Pasando a la siguiente pregunta...")
+      unexpected ->
+        IO.puts("Mensaje inesperado: #{inspect(unexpected)}")
         play_game(pid, username)
     after
-      60_000 -> IO.puts("\n⏰ Tiempo excedido, partida cerrada.")
+      # Timeout general de seguridad (5 minutos)
+      300_000 ->
+        IO.puts("\n⏰ Tiempo de inactividad excedido. Partida cancelada.")
+        main_menu(username)
     end
   end
 

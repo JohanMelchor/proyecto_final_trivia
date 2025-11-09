@@ -56,7 +56,8 @@ defmodule Trivia.Server do
 
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
-        IO.puts("🎯 Partida individual iniciada para #{username} (PID: #{inspect(pid)})")
+        IO.puts("🎯 Partida individual iniciada para #{username}")
+        IO.puts("📝 Configuración: #{num} preguntas de #{category}, #{time}s por pregunta")
         {:ok, pid}
 
       {:error, reason} ->

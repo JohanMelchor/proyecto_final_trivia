@@ -44,6 +44,7 @@ defmodule Trivia.Game do
     end
   end
 
+  @impl true
   def init(%{mode: :single, username: username, category: category, num: num, time: time, caller: caller}) do
     IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}' (singleplayer)...\n")
 
@@ -58,10 +59,13 @@ defmodule Trivia.Game do
       current: nil,
       score: 0,
       time: time,
-      timer_ref: nil
+      timer_ref: nil,
+      answered: false,
+      question_number: 0
     }
 
-    Process.send_after(self(), :next_question, 500)
+    # Iniciar inmediatamente con la primera pregunta
+    Process.send_after(self(), :next_question, 100)
     {:ok, state}
   end
 
@@ -89,29 +93,72 @@ defmodule Trivia.Game do
   end
 
   # --- SINGLEPLAYER ---
+  @impl true
   def handle_info(:next_question, %{mode: :single, questions: []} = state) do
+    IO.puts("🏁 Fin del juego - Puntaje final: #{state.score}")
     UserManager.update_score(state.username, state.score)
     History.save_result(state.username, state.category, state.score)
-    if state.caller, do: send(state.caller, {:game_over, state.score})
+
+    if state.caller do
+      send(state.caller, {:game_over, state.score})
+    end
+
     {:stop, :normal, state}
   end
 
   def handle_info(:next_question, %{mode: :single, questions: [q | rest]} = state) do
-    if state.caller, do: send(state.caller, {:question, q["question"], q["options"]})
-    # Cancelar temporizador anterior si existe
-    if state[:timer_ref], do: Process.cancel_timer(state.timer_ref)
-    # Iniciar nuevo temporizador
+    # Cancelar timer anterior si existe
+    if state.timer_ref do
+      Process.cancel_timer(state.timer_ref)
+    end
+
+    # Enviar pregunta al jugador
+    question_number = state.question_number + 1
+    IO.puts("\n=== Pregunta #{question_number} ===")
+
+    if state.caller do
+      send(state.caller, {:question, q["question"], q["options"]})
+    end
+
+    # Configurar nuevo temporizador
     timer_ref = Process.send_after(self(), :timeout, state.time * 1000)
-    {:noreply, %{state | questions: rest, current: q, timer_ref: timer_ref}}
+
+    {:noreply, %{state |
+      questions: rest,
+      current: q,
+      timer_ref: timer_ref,
+      answered: false,
+      question_number: question_number
+    }}
   end
 
-  def handle_info(:timeout, %{mode: :single} = state) do
-    # Avisar al jugador (cliente) que se agotó el tiempo
-    if state.caller, do: send(state.caller, {:timeout_notice})
+  @impl true
+  def handle_info(:timeout, %{mode: :single, answered: false, current: q} = state) do
+    IO.puts("⏰ Tiempo agotado para: #{q["question"]}")
+    IO.puts("✅ Respuesta correcta: #{q["answer"]}")
 
-    # Cancelar timer anterior y pasar a la siguiente pregunta
-    Process.send_after(self(), :next_question, 1500)
-    {:noreply, %{state | score: state.score - 5, current: nil, timer_ref: nil}}
+    # Penalización por tiempo agotado
+    new_score = state.score - 1
+    IO.puts("📉 Penalización: -1 puntos | Puntaje actual: #{new_score}")
+
+    if state.caller do
+      send(state.caller, {:timeout_notice, q["answer"]})
+    end
+
+    # Programar siguiente pregunta después de breve pausa
+    Process.send_after(self(), :next_question, 2000)
+
+    {:noreply, %{state |
+      score: new_score,
+      current: nil,
+      timer_ref: nil,
+      answered: true
+    }}
+  end
+
+  def handle_info(:timeout, %{mode: :single, answered: true} = state) do
+    # Ignorar timeout si ya se respondió
+    {:noreply, state}
   end
 
   # ===============================
@@ -139,16 +186,53 @@ defmodule Trivia.Game do
       {:noreply, state}
     end
   end
+  # --- SINGLEPLAYER ---
+  @impl true
+  def handle_cast({:answer, answer}, %{mode: :single, current: q, answered: false} = state) do
+    # Cancelar timer inmediatamente
+    if state.timer_ref do
+      Process.cancel_timer(state.timer_ref)
+    end
 
-  def handle_cast({:answer, answer}, %{mode: :single, current: q} = state) do
-    if state[:timer_ref], do: Process.cancel_timer(state.timer_ref)
+    # Verificar respuesta
+    user_answer = String.downcase(String.trim(answer))
+    correct_answer = String.downcase(String.trim(q["answer"]))
+    is_correct = user_answer == correct_answer
 
-    correct = String.downcase(answer) == String.downcase(q["answer"])
-    delta = if correct, do: 5, else: -2
+    # Calcular puntaje
+    delta = if is_correct, do: 5, else: -3
+    new_score = state.score + delta
 
-    if state.caller, do: send(state.caller, {:feedback, correct, delta})
+    # Feedback inmediato
+    IO.puts(if is_correct, do: "✅ Correcto! +#{delta} puntos", else: "❌ Incorrecto! #{delta} puntos")
+    IO.puts("📊 Puntaje actual: #{new_score}")
 
-    Process.send_after(self(), :next_question, 1500)
-    {:noreply, %{state | score: state.score + delta, timer_ref: nil}}
+    if not is_correct do
+      IO.puts("💡 La respuesta correcta era: #{q["answer"]}")
+    end
+
+    # Enviar feedback al CLI
+    if state.caller do
+      send(state.caller, {:feedback, is_correct, delta})
+    end
+
+    # Programar siguiente pregunta después de breve pausa
+    Process.send_after(self(), :next_question, 2000)
+
+    {:noreply, %{state |
+      score: new_score,
+      timer_ref: nil,
+      answered: true
+    }}
+  end
+
+  def handle_cast({:answer, _}, %{mode: :single, answered: true} = state) do
+    IO.puts("⚠️ Ya respondiste esta pregunta. Espera la siguiente...")
+    {:noreply, state}
+  end
+
+  def handle_cast({:answer, _}, %{mode: :single, current: nil} = state) do
+    IO.puts("⚠️ No hay pregunta activa en este momento.")
+    {:noreply, state}
   end
 end
