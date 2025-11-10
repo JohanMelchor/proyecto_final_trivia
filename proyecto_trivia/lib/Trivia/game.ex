@@ -192,20 +192,14 @@ defmodule Trivia.Game do
 
   @impl true
   def handle_cast({:answer, username, ans}, %{mode: :multi, current: q} = state) do
-    IO.puts("🎯 [DEBUG] Recibida respuesta de #{username}: #{ans}")
-    IO.puts("🎯 [DEBUG] Pregunta actual: #{inspect(q)}")
-
     if q && Map.has_key?(state.players, username) do
       player = state.players[username]
 
       if player.answered do
-        IO.puts("⚠️ #{username} ya respondió esta pregunta")
         {:noreply, state}
       else
         correct = String.downcase(ans) == String.downcase(q["answer"])
         delta = if correct, do: 10, else: -5
-
-        IO.puts("🎯 [DEBUG] Respuesta #{if correct, do: "CORRECTA", else: "INCORRECTA"} - Delta: #{delta}")
 
         updated_players =
           Map.update!(state.players, username, fn p ->
@@ -219,15 +213,12 @@ defmodule Trivia.Game do
 
         if all_answered && state.timer_ref do
           Process.cancel_timer(state.timer_ref)
-          IO.puts("✅ Todos respondieron, pasando a siguiente pregunta...")
           Process.send_after(self(), :next_question, 2000)
         end
 
         {:noreply, %{state | players: updated_players}}
       end
     else
-      IO.puts("⚠️ No hay pregunta activa o usuario no encontrado: #{username}")
-      IO.puts("⚠️ Pregunta: #{inspect(q)}, Usuario en players: #{Map.has_key?(state.players, username)}")
       {:noreply, state}
     end
   end

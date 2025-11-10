@@ -474,10 +474,8 @@ defmodule Trivia.CLI do
   end
 
   defp capture_answer(id, username) do
-    # Mostrar prompt inmediatamente
     IO.write("Tu respuesta (a, b, c, d): ")
 
-    # Leer input de manera no bloqueante
     case IO.read(:line) do
       :eof ->
         IO.puts("\n❌ Error de entrada")
@@ -490,7 +488,7 @@ defmodule Trivia.CLI do
             # Enviar respuesta al juego
             case get_game_pid_from_lobby(id) do
               {:ok, game_pid} ->
-                IO.puts("📤 Enviando respuesta: #{answer}")
+                # ⬇️ ELIMINAR MENSAJE DEBUG
                 GenServer.cast(game_pid, {:answer, username, answer})
 
               {:error, reason} ->
@@ -504,12 +502,10 @@ defmodule Trivia.CLI do
 
           answer != "" ->
             IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-            # Reintentar
             Process.sleep(100)
             capture_answer(id, username)
 
           true ->
-            # Entrada vacía, reintentar
             capture_answer(id, username)
         end
 
