@@ -12,7 +12,14 @@ defmodule Trivia.Game do
 
   # Unificada: el CLI puede pasar 2 o 3 argumentos según el modo
   def answer(pid, answer), do: GenServer.cast(pid, {:answer, answer})
-  def answer(pid, username, answer), do: GenServer.cast(pid, {:answer, username, answer})
+  def answer(lobby_id, username, answer) do
+    case :global.whereis_name({:lobby, lobby_id}) do
+      :undefined ->
+        {:error, "Lobby no encontrado"}
+      pid ->
+        GenServer.cast(pid, {:answer, username, answer})
+    end
+  end
 
   # ===============================
   # Inicialización

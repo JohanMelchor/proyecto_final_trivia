@@ -11,8 +11,10 @@ defmodule Trivia.Lobby do
     GenServer.start_link(__MODULE__, args, name: {:global, {:lobby, id}})
   end
 
-  # Crear partida (con validaciones)
   def create_game(id, owner, category, num, time) do
+    # OBTENER EL PID DEL CREATOR (HOST)
+    creator_pid = self()
+
     cond do
       not SessionManager.online?(owner) ->
         {:error, :invalid_user}
@@ -26,9 +28,10 @@ defmodule Trivia.Lobby do
         if questions == [] do
           {:error, :no_questions}
         else
+          # ⬇️ PASAR creator_pid AL MAPA
           case DynamicSupervisor.start_child(
                  Trivia.Server,
-                 {__MODULE__, %{id: id, owner: owner, category: category, num: num, time: time}}
+                 {__MODULE__, %{id: id, owner: owner, category: category, num: num, time: time, creator_pid: creator_pid}}
                ) do
             {:ok, pid} ->
               {:ok, pid}
@@ -42,6 +45,7 @@ defmodule Trivia.Lobby do
         end
     end
   end
+
 
   # Unirse a partida existente
   def join_game(id, username, caller) do
@@ -79,7 +83,26 @@ defmodule Trivia.Lobby do
   # Callbacks principales
   # ===============================
   @impl true
-  def init(%{id: id, owner: owner, category: category, num: num, time: time}) do
+  def init(args) do
+    # ⬇️ MANEJAR DIFERENTES FORMATOS DE ARGUMENTOS
+    case args do
+      %{id: id, owner: owner, category: category, num: num, time: time, creator_pid: creator_pid} ->
+        # Caso con creator_pid explícito
+        do_init(id, owner, category, num, time, creator_pid)
+
+      %{id: id, owner: owner, category: category, num: num, time: time} ->
+        # Caso sin creator_pid - usar self() como fallback
+        IO.puts("⚠️ Advertencia: creator_pid no proporcionado, usando fallback")
+        do_init(id, owner, category, num, time, self())
+
+      _ ->
+        IO.puts("❌ Argumentos inválidos para Lobby: #{inspect(args)}")
+        {:stop, :invalid_args}
+    end
+  end
+
+  # ⬇️ FUNCIÓN PRIVADA PARA INICIALIZACIÓN COMÚN
+  defp do_init(id, owner, category, num, time, creator_pid) do
     questions = QuestionBank.get_random_questions(category, num)
 
     if questions == [] do
@@ -88,7 +111,8 @@ defmodule Trivia.Lobby do
     else
       IO.puts("🎮 Lobby #{id} creado por #{owner}. Esperando jugadores...")
 
-      # Crear estado inicial
+      timer_ref = Process.send_after(self(), :timeout_lobby, 180_000)
+
       state = %{
         id: id,
         owner: owner,
@@ -96,25 +120,12 @@ defmodule Trivia.Lobby do
         num: num,
         time: time,
         started: false,
-        players: %{owner => %{pid: nil, score: 0}},
-        game_pid: nil
+        players: %{owner => %{pid: creator_pid, score: 0}},
+        game_pid: nil,
+        timer_ref: timer_ref
       }
 
-      # Programar cierre por inactividad (3 min)
-      Process.send_after(self(), :timeout_lobby, 180_000)
-
       {:ok, state}
-    end
-  end
-
-  @impl true
-  def handle_info(:timeout_lobby, state) do
-    unless state.started do
-      IO.puts("⏰ Lobby #{state.id} cerrado por inactividad.")
-      send_message_to_all(state.players, "⏰ El lobby fue cerrado por inactividad.")
-      {:stop, :normal, state}
-    else
-      {:noreply, state}
     end
   end
 
@@ -158,6 +169,11 @@ defmodule Trivia.Lobby do
   # ===============================
   @impl true
   def handle_cast(:start, state) do
+    # ⬇️ CANCELAR TIMER DE INACTIVIDAD
+    if state.timer_ref do
+      Process.cancel_timer(state.timer_ref)
+    end
+
     {:ok, game_pid} =
       Game.start_link(%{
         mode: :multi,
@@ -170,20 +186,35 @@ defmodule Trivia.Lobby do
 
     send_message_to_all(state.players, "🚀 ¡Partida iniciada!")
     IO.puts("🕹️ Partida del lobby #{state.id} iniciada.")
-    {:noreply, %{state | started: true, game_pid: game_pid}}
+    {:noreply, %{state | started: true, game_pid: game_pid, timer_ref: nil}}
   end
 
   @impl true
   def handle_cast(:cancel, state) do
+    # ⬇️ CANCELAR TIMER DE INACTIVIDAD
+    if state.timer_ref do
+      Process.cancel_timer(state.timer_ref)
+    end
+
     send_message_to_all(state.players, "❌ El host canceló la partida.")
     IO.puts("❌ Lobby #{state.id} cancelado por el host.")
     {:stop, :normal, state}
   end
 
+  @impl true
+  def handle_info(:timeout_lobby, state) do
+    unless state.started do
+      IO.puts("⏰ Lobby #{state.id} cerrado por inactividad.")
+      send_message_to_all(state.players, "⏰ El lobby fue cerrado por inactividad.")
+      {:stop, :normal, state}
+    else
+      {:noreply, state}
+    end
+  end
+
   # ===============================
   # Comunicación con Trivia.Game
   # ===============================
-  @impl true
   def handle_info({:question, q}, state) do
     send_message_to_all(state.players, "\n❓ #{q["question"]}")
     Enum.each(q["options"], fn {k, v} -> send_message_to_all(state.players, "#{k}. #{v}") end)
@@ -213,11 +244,36 @@ defmodule Trivia.Lobby do
   end
 
   # ===============================
+  # Manejo de respuestas
+  # ===============================
+
+  @impl true
+  def handle_cast({:answer, username, answer}, state) do
+    if state.game_pid do
+      # Reenviar la respuesta al juego
+      GenServer.cast(state.game_pid, {:answer, username, answer})
+    else
+      IO.puts("⚠️ No hay partida activa para recibir respuestas")
+    end
+    {:noreply, state}
+  end
+
+  # ===============================
   # Utilidad de envío de mensajes
   # ===============================
   defp send_message_to_all(players, msg) do
-    Enum.each(players, fn {_u, %{pid: pid}} ->
-      if pid, do: send(pid, {:game_message, msg})
+    Enum.each(players, fn {username, %{pid: pid}} ->
+      if pid && Process.alive?(pid) do
+        try do
+          send(pid, {:game_message, msg})
+        rescue
+          _ ->
+            IO.puts("⚠️ No se pudo enviar mensaje a #{username}")
+        end
+      else
+        IO.puts("⚠️ PID no válido o proceso muerto para #{username}")
+      end
     end)
   end
+
 end

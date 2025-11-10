@@ -27,7 +27,22 @@ defmodule Trivia.Server do
   # API pública
   # ===============================
 
-  # 🔹 Iniciar una nueva partida individual
+  defp send_message_to_all(players, msg) do
+    Enum.each(players, fn {username, %{pid: pid}} ->
+      if pid && Process.alive?(pid) do
+        try do
+          send(pid, {:game_message, msg})
+        rescue
+          _ ->
+            IO.puts("⚠️ No se pudo enviar mensaje a #{username}")
+        end
+      else
+        IO.puts("⚠️ PID no válido o proceso muerto para #{username}")
+      end
+    end)
+  end
+
+  # iniciar una partida singleplayer
   def start_game(%{
         username: username,
         category: category,
@@ -57,7 +72,6 @@ defmodule Trivia.Server do
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
         IO.puts("🎯 Partida individual iniciada para #{username}")
-        IO.puts("📝 Configuración: #{num} preguntas de #{category}, #{time}s por pregunta")
         {:ok, pid}
 
       {:error, reason} ->
@@ -68,17 +82,26 @@ defmodule Trivia.Server do
 
   # 🔹 Iniciar una partida multijugador (Lobby)
   def start_game(%{id: id, owner: owner, category: category, num: num, time: time}) do
+    creator_pid = self()
+
     spec = %{
       id: {:lobby, id},
       start:
         {Lobby, :start_link,
-         [%{id: id, owner: owner, category: category, num: num, time: time}]},
+         [%{
+           id: id,
+           owner: owner,
+           category: category,
+           num: num,
+           time: time,
+           creator_pid: creator_pid
+         }]},
       restart: :temporary
     }
 
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
-        IO.puts("🎮 Partida multijugador #{id} creada por #{owner} (PID: #{inspect(pid)})")
+        IO.puts("🎮 Partida multijugador #{id} creada por #{owner}")
         {:ok, pid}
 
       {:error, reason} ->

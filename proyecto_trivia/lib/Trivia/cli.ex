@@ -213,27 +213,25 @@ defmodule Trivia.CLI do
       "1" ->
         Trivia.Lobby.start_game(id)
         IO.puts("🚀 Partida iniciada! Espera las preguntas...\n")
-        listen_multiplayer()
+        listen_multiplayer(id, username)  # ⬅️ Pasar id y username
       "2" ->
         Trivia.Lobby.cancel_game(id)
         IO.puts("❌ Partida cancelada.\n")
-        :ok
-      _ -> host_lobby_menu(id, username)
+        multiplayer_menu(username)
+      _ ->
+        host_lobby_menu(id, username)
     end
   end
 
   defp guest_lobby_menu(id, username) do
     IO.puts("\n=== 🕒 Esperando inicio de partida #{id} ===")
-    IO.puts("1. Salir de la partida")
-    listen_multiplayer()
-    case IO.gets("Seleccione: ") |> String.trim() do
-      "1" ->
-        Trivia.Lobby.leave_game(id, username)
-        IO.puts("🚪 Saliste de la partida.")
-        multiplayer_menu(username)
-      _ ->
-        guest_lobby_menu(id, username)
-    end
+    IO.puts("Escribe 'salir' para abandonar la partida")
+
+    # Escuchar mensajes del juego
+    listen_multiplayer(id, username)
+
+    # Si sale de listen_multiplayer, volver al menú
+    multiplayer_menu(username)
   end
 
   # ===============================
@@ -352,8 +350,10 @@ defmodule Trivia.CLI do
   defp seleccionar_opcion(categories) do
     opt = IO.gets("\nSeleccione una categoría: ") |> String.trim()
     case Integer.parse(opt) do
-      {n, _} when n in 1..length(categories) -> Enum.at(categories, n - 1)
-      _ -> hd(categories)
+      {n, _} when n in 1..length(categories)//1 ->  # ⬅️ Corregir el warning del rango
+        Enum.at(categories, n - 1)
+      _ ->
+        hd(categories)
     end
   end
 
@@ -395,7 +395,6 @@ defmodule Trivia.CLI do
     main_menu(username)
   end
 
-  defp handle_input(nil), do: ""
   defp handle_input(input), do: String.trim(input)
 
   defp ensure_server_started do
@@ -412,13 +411,61 @@ defmodule Trivia.CLI do
     end
   end
 
-  defp listen_multiplayer do
+  defp listen_multiplayer(id, username) do
     receive do
       {:game_message, msg} ->
         IO.puts("\n📢 #{msg}")
-        listen_multiplayer()
+        listen_multiplayer(id, username)
+
+      {:question, q} ->
+        IO.puts("\n" <> String.duplicate("=", 50))
+        IO.puts("❓ #{q["question"]}")
+        IO.puts(String.duplicate("-", 50))
+        Enum.each(q["options"], fn {k, v} -> IO.puts("#{k}. #{v}") end)
+        IO.puts(String.duplicate("=", 50))
+
+        # Pedir respuesta en proceso separado
+        spawn(fn ->
+          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
+                  |> String.trim()
+                  |> String.downcase()
+
+          if answer in ["a", "b", "c", "d"] do
+            # Enviar respuesta al juego a través del lobby
+            Game.answer(id, username, answer)
+          else
+            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+          end
+        end)
+
+        listen_multiplayer(id, username)
+
+      {:player_answered, user, correct, delta} ->
+        IO.puts("#{user} respondió #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+        listen_multiplayer(id, username)
+
+      {:timeout, _} ->
+        IO.puts("⏰ Tiempo agotado! Siguiente pregunta...")
+        listen_multiplayer(id, username)
+
+      {:game_over, players} ->
+        IO.puts("\n" <> String.duplicate("🎉", 20))
+        IO.puts("🏁 ¡FIN DE LA PARTIDA MULTIJUGADOR!")
+        IO.puts(String.duplicate("-", 50))
+        Enum.each(players, fn {u, %{score: s}} ->
+          IO.puts("#{u}: #{s} puntos")
+        end)
+        IO.puts(String.duplicate("🎉", 20))
+        multiplayer_menu(username)
+
+      unexpected ->
+        IO.puts("Mensaje inesperado en multiplayer: #{inspect(unexpected)}")
+        listen_multiplayer(id, username)
     after
-      180_000 -> IO.puts("\n⏰ Desconectado por inactividad.")
+      # Timeout más corto para multijugador
+      120_000 ->
+        IO.puts("\n⏰ Desconectado por inactividad en el lobby.")
+        multiplayer_menu(username)
     end
   end
 end
