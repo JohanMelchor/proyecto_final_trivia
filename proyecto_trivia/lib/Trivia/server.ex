@@ -27,21 +27,6 @@ defmodule Trivia.Server do
   # API pública
   # ===============================
 
-  defp send_message_to_all(players, msg) do
-    Enum.each(players, fn {username, %{pid: pid}} ->
-      if pid && Process.alive?(pid) do
-        try do
-          send(pid, {:game_message, msg})
-        rescue
-          _ ->
-            IO.puts("⚠️ No se pudo enviar mensaje a #{username}")
-        end
-      else
-        IO.puts("⚠️ PID no válido o proceso muerto para #{username}")
-      end
-    end)
-  end
-
   # iniciar una partida singleplayer
   def start_game(%{
         username: username,

@@ -35,10 +35,16 @@ defmodule Trivia.Game do
       IO.puts("⚠️ No hay preguntas disponibles para la categoría #{args.category}.")
       {:stop, :no_questions}
     else
+      # ⬇️ INICIALIZAR JUGADORES CON ESTADO answered: false
+      players_with_state =
+        Enum.into(args.players, %{}, fn {username, data} ->
+          {username, Map.put(data, :answered, false)}
+        end)
+
       state = %{
         mode: :multi,
         lobby_pid: args.lobby_pid,
-        players: args.players,
+        players: players_with_state,
         category: args.category,
         questions: questions,
         current: nil,
@@ -88,9 +94,21 @@ defmodule Trivia.Game do
   end
 
   def handle_info(:next_question, %{mode: :multi, questions: [q | rest]} = state) do
+    # ⬇️ RESETEAR ESTADO DE RESPUESTAS PARA NUEVA PREGUNTA
+     reset_players =
+      Enum.into(state.players, %{}, fn {username, data} ->
+        {username, %{data | answered: false}}
+      end)
+
     send(state.lobby_pid, {:question, q})
     ref = Process.send_after(self(), :timeout, state.time * 1000)
-    {:noreply, %{state | questions: rest, current: q, timer_ref: ref}}
+
+    {:noreply, %{state |
+      questions: rest,
+      current: q,
+      timer_ref: ref,
+      players: reset_players
+    }}
   end
 
   def handle_info(:timeout, %{mode: :multi} = state) do
@@ -174,25 +192,46 @@ defmodule Trivia.Game do
 
   @impl true
   def handle_cast({:answer, username, ans}, %{mode: :multi, current: q} = state) do
+    IO.puts("🎯 [DEBUG] Recibida respuesta de #{username}: #{ans}")
+    IO.puts("🎯 [DEBUG] Pregunta actual: #{inspect(q)}")
+
     if q && Map.has_key?(state.players, username) do
-      correct = String.downcase(ans) == String.downcase(q["answer"])
-      delta = if correct, do: 10, else: -5
+      player = state.players[username]
 
-      updated_players =
-        Map.update!(state.players, username, fn p ->
-          %{p | score: p.score + delta}
-        end)
+      if player.answered do
+        IO.puts("⚠️ #{username} ya respondió esta pregunta")
+        {:noreply, state}
+      else
+        correct = String.downcase(ans) == String.downcase(q["answer"])
+        delta = if correct, do: 10, else: -5
 
-      send(state.lobby_pid, {:player_answered, username, correct, delta})
+        IO.puts("🎯 [DEBUG] Respuesta #{if correct, do: "CORRECTA", else: "INCORRECTA"} - Delta: #{delta}")
 
-      if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
-      Process.send_after(self(), :next_question, 1500)
+        updated_players =
+          Map.update!(state.players, username, fn p ->
+            %{p | score: p.score + delta, answered: true}
+          end)
 
-      {:noreply, %{state | players: updated_players, current: nil, timer_ref: nil}}
+        send(state.lobby_pid, {:player_answered, username, correct, delta})
+
+        # Verificar si todos respondieron
+        all_answered = Enum.all?(updated_players, fn {_, p} -> p.answered end)
+
+        if all_answered && state.timer_ref do
+          Process.cancel_timer(state.timer_ref)
+          IO.puts("✅ Todos respondieron, pasando a siguiente pregunta...")
+          Process.send_after(self(), :next_question, 2000)
+        end
+
+        {:noreply, %{state | players: updated_players}}
+      end
     else
+      IO.puts("⚠️ No hay pregunta activa o usuario no encontrado: #{username}")
+      IO.puts("⚠️ Pregunta: #{inspect(q)}, Usuario en players: #{Map.has_key?(state.players, username)}")
       {:noreply, state}
     end
   end
+
   # --- SINGLEPLAYER ---
   @impl true
   def handle_cast({:answer, answer}, %{mode: :single, current: q, answered: false} = state) do

@@ -84,14 +84,11 @@ defmodule Trivia.Lobby do
   # ===============================
   @impl true
   def init(args) do
-    # ⬇️ MANEJAR DIFERENTES FORMATOS DE ARGUMENTOS
     case args do
       %{id: id, owner: owner, category: category, num: num, time: time, creator_pid: creator_pid} ->
-        # Caso con creator_pid explícito
         do_init(id, owner, category, num, time, creator_pid)
 
       %{id: id, owner: owner, category: category, num: num, time: time} ->
-        # Caso sin creator_pid - usar self() como fallback
         IO.puts("⚠️ Advertencia: creator_pid no proporcionado, usando fallback")
         do_init(id, owner, category, num, time, self())
 
@@ -101,7 +98,6 @@ defmodule Trivia.Lobby do
     end
   end
 
-  # ⬇️ FUNCIÓN PRIVADA PARA INICIALIZACIÓN COMÚN
   defp do_init(id, owner, category, num, time, creator_pid) do
     questions = QuestionBank.get_random_questions(category, num)
 
@@ -113,6 +109,7 @@ defmodule Trivia.Lobby do
 
       timer_ref = Process.send_after(self(), :timeout_lobby, 180_000)
 
+      # ⬇️ INICIALIZAR JUGADOR CON answered: false
       state = %{
         id: id,
         owner: owner,
@@ -120,13 +117,17 @@ defmodule Trivia.Lobby do
         num: num,
         time: time,
         started: false,
-        players: %{owner => %{pid: creator_pid, score: 0}},
+        players: %{owner => %{pid: creator_pid, score: 0, answered: false}},
         game_pid: nil,
         timer_ref: timer_ref
       }
 
       {:ok, state}
     end
+  end
+
+  def handle_call(:get_game_pid, _from, state) do
+    {:reply, state.game_pid, state}
   end
 
   # ===============================
@@ -147,7 +148,8 @@ defmodule Trivia.Lobby do
       true ->
         send_message_to_all(state.players, "👋 #{username} se unió a la partida.")
         IO.puts("✅ #{username} se unió al lobby #{state.id}")
-        new_state = %{state | players: Map.put(state.players, username, %{pid: caller, score: 0})}
+        # ⬇️ NUEVO JUGADOR CON answered: false
+        new_state = %{state | players: Map.put(state.players, username, %{pid: caller, score: 0, answered: false})}
         {:reply, {:ok, "Unido correctamente"}, new_state}
     end
   end
@@ -215,32 +217,29 @@ defmodule Trivia.Lobby do
   # ===============================
   # Comunicación con Trivia.Game
   # ===============================
+  @impl true
   def handle_info({:question, q}, state) do
-    send_message_to_all(state.players, "\n❓ #{q["question"]}")
-    Enum.each(q["options"], fn {k, v} -> send_message_to_all(state.players, "#{k}. #{v}") end)
+    # ⬇️ ENVIAR MENSAJE ESTRUCTURADO, NO STRINGS
+    send_message_to_all(state.players, {:question, q["question"], q["options"]})
     {:noreply, state}
   end
 
   def handle_info({:player_answered, username, correct, delta}, state) do
     send_message_to_all(
       state.players,
-      "#{username} respondió #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)"
+      {:player_answered, username, correct, delta}
     )
     {:noreply, state}
   end
 
   def handle_info({:timeout, _}, state) do
-    send_message_to_all(state.players, "⏰ Tiempo agotado! Siguiente pregunta...")
+    send_message_to_all(state.players, {:timeout, nil})
     {:noreply, state}
   end
 
   def handle_info({:game_over, players}, state) do
-    send_message_to_all(players, "🏁 ¡Fin de la partida!")
-    Enum.each(players, fn {u, %{score: s}} ->
-      UserManager.update_score(u, s)
-      History.save_result(u, state.category, s)
-    end)
-    {:stop, :normal, state}
+    send_message_to_all(state.players, {:game_over, players})
+    {:noreply, state}
   end
 
   # ===============================
@@ -261,11 +260,11 @@ defmodule Trivia.Lobby do
   # ===============================
   # Utilidad de envío de mensajes
   # ===============================
-  defp send_message_to_all(players, msg) do
+  defp send_message_to_all(players, message) do
     Enum.each(players, fn {username, %{pid: pid}} ->
       if pid && Process.alive?(pid) do
         try do
-          send(pid, {:game_message, msg})
+          send(pid, message)
         rescue
           _ ->
             IO.puts("⚠️ No se pudo enviar mensaje a #{username}")

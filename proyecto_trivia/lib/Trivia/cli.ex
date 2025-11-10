@@ -417,25 +417,16 @@ defmodule Trivia.CLI do
         IO.puts("\n📢 #{msg}")
         listen_multiplayer(id, username)
 
-      {:question, q} ->
+      {:question, question, options} ->
         IO.puts("\n" <> String.duplicate("=", 50))
-        IO.puts("❓ #{q["question"]}")
+        IO.puts("❓ #{question}")
         IO.puts(String.duplicate("-", 50))
-        Enum.each(q["options"], fn {k, v} -> IO.puts("#{k}. #{v}") end)
+        Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
 
-        # Pedir respuesta en proceso separado
+        # ⬇️ CAPTURAR RESPUESTA INMEDIATAMENTE
         spawn(fn ->
-          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
-                  |> String.trim()
-                  |> String.downcase()
-
-          if answer in ["a", "b", "c", "d"] do
-            # Enviar respuesta al juego a través del lobby
-            Game.answer(id, username, answer)
-          else
-            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-          end
+          capture_answer(id, username)
         end)
 
         listen_multiplayer(id, username)
@@ -458,14 +449,91 @@ defmodule Trivia.CLI do
         IO.puts(String.duplicate("🎉", 20))
         multiplayer_menu(username)
 
+      # Manejar mensaje de pregunta del formato antiguo (backward compatibility)
+      {:question, q} when is_map(q) ->
+        IO.puts("\n" <> String.duplicate("=", 50))
+        IO.puts("❓ #{q["question"]}")
+        IO.puts(String.duplicate("-", 50))
+        Enum.each(q["options"], fn {k, v} -> IO.puts("#{k}. #{v}") end)
+        IO.puts(String.duplicate("=", 50))
+
+        spawn(fn ->
+          capture_answer(id, username)
+        end)
+
+        listen_multiplayer(id, username)
+
       unexpected ->
         IO.puts("Mensaje inesperado en multiplayer: #{inspect(unexpected)}")
         listen_multiplayer(id, username)
     after
-      # Timeout más corto para multijugador
-      120_000 ->
-        IO.puts("\n⏰ Desconectado por inactividad en el lobby.")
+      300_000 ->  # 5 minutos de timeout general
+        IO.puts("\n⏰ Desconectado por inactividad.")
         multiplayer_menu(username)
+    end
+  end
+
+  defp capture_answer(id, username) do
+    # Mostrar prompt inmediatamente
+    IO.write("Tu respuesta (a, b, c, d): ")
+
+    # Leer input de manera no bloqueante
+    case IO.read(:line) do
+      :eof ->
+        IO.puts("\n❌ Error de entrada")
+
+      answer when is_binary(answer) ->
+        answer = answer |> String.trim() |> String.downcase()
+
+        cond do
+          answer in ["a", "b", "c", "d"] ->
+            # Enviar respuesta al juego
+            case get_game_pid_from_lobby(id) do
+              {:ok, game_pid} ->
+                IO.puts("📤 Enviando respuesta: #{answer}")
+                GenServer.cast(game_pid, {:answer, username, answer})
+
+              {:error, reason} ->
+                IO.puts("❌ Error al enviar respuesta: #{reason}")
+            end
+
+          answer == "salir" ->
+            IO.puts("🚪 Saliendo de la partida...")
+            Trivia.Lobby.leave_game(id, username)
+            multiplayer_menu(username)
+
+          answer != "" ->
+            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+            # Reintentar
+            Process.sleep(100)
+            capture_answer(id, username)
+
+          true ->
+            # Entrada vacía, reintentar
+            capture_answer(id, username)
+        end
+
+      _ ->
+        IO.puts("❌ Error de entrada")
+    end
+  end
+
+  defp get_game_pid_from_lobby(id) do
+    case :global.whereis_name({:lobby, id}) do
+      :undefined ->
+        {:error, "Lobby no encontrado"}
+      lobby_pid ->
+        try do
+          game_pid = GenServer.call(lobby_pid, :get_game_pid, 5000)  # 5 segundos timeout
+          if game_pid && Process.alive?(game_pid) do
+            {:ok, game_pid}
+          else
+            {:error, "Juego no disponible"}
+          end
+        catch
+          :exit, _ -> {:error, "Timeout al comunicarse con el lobby"}
+          _, _ -> {:error, "Error al comunicarse con el lobby"}
+        end
     end
   end
 end
