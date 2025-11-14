@@ -5,7 +5,7 @@ defmodule Trivia.CLI do
   # PUNTO DE ENTRADA
   # ===============================
   def start do
-    IO.puts("\n=== 🎮 Bienvenido a Trivia Elixir ===\n")
+    IO.puts("\n=== 🎮 Bienvenido  ===\n")
     {:ok, _} = ensure_server_started()
     {:ok, _} = ensure_session_manager_started()
     auth_menu()

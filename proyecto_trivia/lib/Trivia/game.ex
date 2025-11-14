@@ -89,6 +89,11 @@ defmodule Trivia.Game do
   # --- MULTIJUGADOR ---
   @impl true
   def handle_info(:next_question, %{mode: :multi, questions: []} = state) do
+    Enum.each(state.players, fn {username, %{score: score}} ->
+      Trivia.UserManager.update_score(username, score)
+      Trivia.History.save_result(username, state.category, score)
+    end)
+
     send(state.lobby_pid, {:game_over, state.players})
     {:stop, :normal, state}
   end
