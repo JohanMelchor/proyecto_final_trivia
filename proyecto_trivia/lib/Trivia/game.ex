@@ -116,10 +116,23 @@ defmodule Trivia.Game do
     }}
   end
 
-  def handle_info(:timeout, %{mode: :multi} = state) do
+  def handle_info(:timeout, %{mode: :multi, current: q, players: players} = state) do
+    # ⬇️ PENALIZAR JUGADORES QUE NO RESPONDIERON
+    updated_players =
+      Enum.into(players, %{}, fn {username, data} ->
+        if not data.answered do
+          # Penalizar por no responder (-5 puntos)
+          new_data = %{data | score: data.score - 5, answered: true}
+          send(state.lobby_pid, {:player_answered, username, false, -5})
+          {username, new_data}
+        else
+          {username, data}
+        end
+      end)
+
     send(state.lobby_pid, {:timeout, state.current})
     Process.send_after(self(), :next_question, 2000)
-    {:noreply, %{state | current: nil, timer_ref: nil}}
+    {:noreply, %{state | current: nil, timer_ref: nil, players: updated_players}}
   end
 
   # --- SINGLEPLAYER ---
