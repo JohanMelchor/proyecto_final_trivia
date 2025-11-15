@@ -118,6 +118,7 @@ defmodule Trivia.Lobby do
         time: time,
         started: false,
         players: %{owner => %{pid: creator_pid, score: 0, answered: false}},
+        monitors: %{owner => Process.monitor(creator_pid)},
         game_pid: nil,
         timer_ref: timer_ref
       }
@@ -148,8 +149,10 @@ defmodule Trivia.Lobby do
       true ->
         send_message_to_all(state.players, "👋 #{username} se unió a la partida.")
         IO.puts("✅ #{username} se unió al lobby #{state.id}")
-        # ⬇️ NUEVO JUGADOR CON answered: false
-        new_state = %{state | players: Map.put(state.players, username, %{pid: caller, score: 0, answered: false})}
+        monitor = Process.monitor(caller)
+        new_players = Map.put(state.players, username, %{pid: caller, score: 0, answered: false})
+        new_monitors = Map.put(state.monitors || %{}, username, monitor)
+        new_state = %{state | players: new_players, monitors: new_monitors}
         {:reply, {:ok, "Unido correctamente"}, new_state}
     end
   end
@@ -217,6 +220,32 @@ defmodule Trivia.Lobby do
       {:stop, :normal, state}
     else
       {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+    case Enum.find(state.monitors || %{}, fn {_user, mref} -> mref == ref end) do
+      {username, _} ->
+        IO.puts("⚠️ PID no válido o proceso muerto para #{username}")
+        # eliminar monitor y jugador
+        new_monitors = Map.drop(state.monitors || %{}, [username])
+        new_players = Map.delete(state.players, username)
+        # notificar a los demás
+        send_message_to_all(new_players, "🚪 #{username} se desconectó.")
+        # si el juego ya empezó, avisar al Game para forzar timeout de ese jugador
+        if state.started && state.game_pid do
+          GenServer.cast(state.game_pid, {:player_disconnected, username})
+        end
+        # si no quedan jugadores, cerrar lobby
+        if map_size(new_players) == 0 do
+          {:stop, :normal, %{state | players: new_players, monitors: new_monitors}}
+        else
+          {:noreply, %{state | players: new_players, monitors: new_monitors}}
+        end
+
+      nil ->
+        {:noreply, state}
     end
   end
 

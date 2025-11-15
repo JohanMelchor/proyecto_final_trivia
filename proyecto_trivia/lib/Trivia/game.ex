@@ -303,4 +303,36 @@ defmodule Trivia.Game do
     IO.puts("⚠️ No hay pregunta activa en este momento.")
     {:noreply, state}
   end
+
+  @impl true
+  def handle_cast({:player_disconnected, username}, %{mode: :multi, current: q, players: players} = state) do
+    # Si el jugador ya estaba marcado como answered, ignorar
+    if Map.has_key?(players, username) do
+      player = players[username]
+      if player.answered do
+        {:noreply, state}
+      else
+        # aplicar penalización por desconexión / no respuesta
+        delta = -5
+        updated_players = Map.update!(players, username, fn p -> %{p | score: p.score + delta, answered: true} end)
+        resp = {username, :timeout, false, delta}
+        new_responses = [resp | state.current_responses]
+
+        # comprobar si ya todos respondieron
+        all_answered = Enum.all?(updated_players, fn {_u, p} -> p.answered end)
+
+        if all_answered do
+          # enviar resumen y programar siguiente pregunta
+          send(state.lobby_pid, {:question_summary, Enum.reverse(new_responses)})
+          if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
+          Process.send_after(self(), :next_question, 2000)
+          {:noreply, %{state | players: updated_players, current_responses: new_responses}}
+        else
+          {:noreply, %{state | players: updated_players, current_responses: new_responses}}
+        end
+      end
+    else
+      {:noreply, state}
+    end
+  end
 end
