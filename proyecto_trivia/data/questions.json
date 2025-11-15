@@ -467,8 +467,8 @@
       "answer": "a"
     },
     {
-      "question": "¿Qué película de animación de Pixar tiene como personaje principal a un robot llamado WALL-E?",
-      "options": { "a": "Cars", "b": "Ratatouille", "c": "WALL-E", "d": "Up" },
+      "question": "¿Qué película de animación de Pixar tiene como personaje principal un juguete?",
+      "options": { "a": "Cars", "b": "Ratatouille", "c": "Toy Story", "d": "Up" },
       "answer": "c"
     },
     {
