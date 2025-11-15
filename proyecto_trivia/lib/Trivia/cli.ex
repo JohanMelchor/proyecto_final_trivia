@@ -6,16 +6,14 @@ defmodule Trivia.CLI do
   # ===============================
   def start do
     IO.puts("\n===  Bienvenido  ===\n")
-    {:ok, _} = ensure_server_started()
-    {:ok, _} = ensure_session_manager_started()
+    Application.ensure_all_started(:proyecto_trivia)
     auth_menu()
   end
 
   # Solo inicia los procesos globales
   def start_server do
-    {:ok, _} = ensure_session_manager_started()
-    {:ok, _} = ensure_server_started()
-    IO.puts("\n===  SERVIDOR DE TRIVIA INICIADO ===\n")
+    Application.ensure_all_started(:proyecto_trivia)
+    IO.puts("\n===  SERVIDOR DE TRIVIA INICIADO (supervisor) ===\n")
     IO.puts("Esperando jugadores remotos...\n")
     Process.sleep(:infinity)
   end
@@ -408,20 +406,6 @@ defmodule Trivia.CLI do
   end
 
   defp handle_input(input), do: String.trim(input)
-
-  defp ensure_server_started do
-    case Process.whereis(Server) do
-      nil -> Server.start_link(nil)
-      pid -> {:ok, pid}
-    end
-  end
-
-  defp ensure_session_manager_started do
-    case :global.whereis_name(Trivia.SessionManager) do
-      :undefined -> SessionManager.start_link(nil)
-      pid when is_pid(pid) -> {:ok, pid}
-    end
-  end
 
   defp listen_multiplayer(id, username) do
     receive do
