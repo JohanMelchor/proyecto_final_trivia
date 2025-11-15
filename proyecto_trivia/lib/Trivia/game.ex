@@ -124,21 +124,28 @@ defmodule Trivia.Game do
 
   def handle_info(:timeout, %{mode: :multi, current: q, players: players} = state) do
     # ⬇️ PENALIZAR JUGADORES QUE NO RESPONDIERON
-    updated_players =
-      Enum.into(players, %{}, fn {username, data} ->
+    {updated_players, timeout_responses} =
+      Enum.map_reduce(players, [], fn {username, data}, acc ->
         if not data.answered do
           # Penalizar por no responder (-5 puntos)
           new_data = %{data | score: data.score - 5, answered: true}
-          send(state.lobby_pid, {:player_answered, username, false, -5})
-          {username, new_data}
+          # respuesta con razón :timeout
+          resp = {username, :timeout, false, -5}
+          { {username, new_data}, [resp | acc] }
         else
-          {username, data}
+          { {username, data}, acc }
         end
       end)
 
+    # enviar resumen compuesto por las respuestas ya recibidas + las de timeout
+    combined_summary = Enum.reverse(state.current_responses) ++ Enum.reverse(timeout_responses)
+    send(state.lobby_pid, {:question_summary, combined_summary})
+
+    # notificar timeout general (opcional, el lobby ya recibirá question_summary)
     send(state.lobby_pid, {:timeout, state.current})
+
     Process.send_after(self(), :next_question, 2000)
-    {:noreply, %{state | current: nil, timer_ref: nil, players: updated_players}}
+    {:noreply, %{state | current: nil, timer_ref: nil, players: Enum.into(updated_players, %{}), current_responses: []}}
   end
 
   # --- SINGLEPLAYER ---
@@ -226,18 +233,21 @@ defmodule Trivia.Game do
         delta = if correct, do: 10, else: -5
 
         updated_players =
-          Map.update!(state.players, username, fn p ->
-            %{p | score: p.score + delta, answered: true}
-          end)
+          Map.update!(state.players, username, fn p -> %{p | score: p.score + delta, answered: true} end)
 
-        new_responses = [{username, correct, delta} | state.current_responses]
+        # incluir razón :answered en la respuesta
+        response = {username, :answered, correct, delta}
+        new_responses = [response | state.current_responses]
+
+        # enviar aviso individual (puede mostrarse en CLI instantáneamente)
+        send(state.lobby_pid, {:player_answered, username, :answered, correct, delta})
 
         # Verificar si todos respondieron
         all_answered = Enum.all?(updated_players, fn {_, p} -> p.answered end)
 
         if all_answered do
           # ⬇️ ENVIAR RESUMEN CUANDO TODOS HAYAN RESPONDIDO
-          send(state.lobby_pid, {:question_summary, new_responses})
+          send(state.lobby_pid, {:question_summary, Enum.reverse(new_responses)})
 
           if state.timer_ref do
             Process.cancel_timer(state.timer_ref)

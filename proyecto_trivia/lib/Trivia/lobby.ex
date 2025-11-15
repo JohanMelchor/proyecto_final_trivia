@@ -230,11 +230,13 @@ defmodule Trivia.Lobby do
     {:noreply, state}
   end
 
-  def handle_info({:player_answered, username, correct, delta}, state) do
+  def handle_info({:player_answered, username, reason, correct, delta}, state) do
+    # reenviar a todos los clientes para notificación inmediata
     {:noreply, state}
   end
 
   def handle_info({:question_summary, summary}, state) do
+    # summary es lista de {username, reason, correct, delta}
     send_message_to_all(state.players, {:question_summary, summary})
     {:noreply, state}
   end

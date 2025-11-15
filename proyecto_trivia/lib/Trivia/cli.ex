@@ -436,9 +436,15 @@ defmodule Trivia.CLI do
         IO.puts("\n" <> String.duplicate("=", 50))
         IO.puts("📊 RESUMEN DE RESPUESTAS:")
         IO.puts(String.duplicate("-", 50))
-        Enum.each(summary, fn {user, correct, delta} ->
-          status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
-          IO.puts("#{user}: #{status} (#{delta} pts)")
+        Enum.each(summary, fn
+          {user, :timeout, _correct, delta} ->
+            IO.puts("#{user}: ❌ tiempo agotado (#{delta} pts)")
+          {user, :answered, correct, delta} ->
+            status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
+            IO.puts("#{user}: #{status} (#{delta} pts)")
+          {user, _other, correct, delta} ->
+            status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
+            IO.puts("#{user}: #{status} (#{delta} pts)")
         end)
         IO.puts(String.duplicate("=", 50))
         listen_multiplayer(id, username)
@@ -455,8 +461,15 @@ defmodule Trivia.CLI do
 
         listen_multiplayer(id, username)
 
-      {:player_answered, user, correct, delta} ->
-        IO.puts("#{user} respondió #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+      {:player_answered, user, reason, correct, delta} ->
+        case reason do
+          :timeout ->
+            IO.puts("#{user}: ❌ tiempo agotado (#{delta} pts)")
+          :answered ->
+            IO.puts("#{user}: #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+          _ ->
+            IO.puts("#{user}: #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+        end
         listen_multiplayer(id, username)
 
       {:timeout, _} ->
