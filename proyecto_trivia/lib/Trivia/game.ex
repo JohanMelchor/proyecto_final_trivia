@@ -27,15 +27,15 @@ defmodule Trivia.Game do
 
   @impl true
   def init(%{mode: :multi} = args) do
-    IO.puts("\n🎮 Iniciando partida MULTIJUGADOR en '#{args.category}'...\n")
+    IO.puts("\n Iniciando partida MULTIJUGADOR en '#{args.category}'...\n")
 
     questions = QuestionBank.get_random_questions(args.category, args.num)
 
     if questions == [] do
-      IO.puts("⚠️ No hay preguntas disponibles para la categoría #{args.category}.")
+      IO.puts(" No hay preguntas disponibles para la categoría #{args.category}.")
       {:stop, :no_questions}
     else
-      # ⬇️ INICIALIZAR JUGADORES CON ESTADO answered: false
+      #  INICIALIZAR JUGADORES CON ESTADO answered: false
       players_with_state =
         Enum.into(args.players, %{}, fn {username, data} ->
           {username, Map.put(data, :answered, false)}
@@ -95,6 +95,8 @@ defmodule Trivia.Game do
     end)
 
     send(state.lobby_pid, {:game_over, state.players})
+
+    send(state.lobby_pid, :game_finished)
     {:stop, :normal, state}
   end
 
@@ -151,7 +153,7 @@ defmodule Trivia.Game do
   # --- SINGLEPLAYER ---
   @impl true
   def handle_info(:next_question, %{mode: :single, questions: []} = state) do
-    IO.puts("🏁 Fin del juego - Puntaje final: #{state.score}")
+    IO.puts(" Fin del juego - Puntaje final: #{state.score}")
     UserManager.update_score(state.username, state.score)
     History.save_result(state.username, state.category, state.score)
 
@@ -190,12 +192,12 @@ defmodule Trivia.Game do
 
   @impl true
   def handle_info(:timeout, %{mode: :single, answered: false, current: q} = state) do
-    IO.puts("⏰ Tiempo agotado para: #{q["question"]}")
-    IO.puts("✅ Respuesta correcta: #{q["answer"]}")
+    IO.puts(" Tiempo agotado para: #{q["question"]}")
+    IO.puts(" Respuesta correcta: #{q["answer"]}")
 
     # Penalización por tiempo agotado
     new_score = state.score - 1
-    IO.puts("📉 Penalización: -1 puntos | Puntaje actual: #{new_score}")
+    IO.puts(" Penalización: -1 puntos | Puntaje actual: #{new_score}")
 
     if state.caller do
       send(state.caller, {:timeout_notice, q["answer"]})
@@ -295,12 +297,12 @@ defmodule Trivia.Game do
   end
 
   def handle_cast({:answer, _}, %{mode: :single, answered: true} = state) do
-    IO.puts("⚠️ Ya respondiste esta pregunta. Espera la siguiente...")
+    IO.puts(" Ya respondiste esta pregunta. Espera la siguiente...")
     {:noreply, state}
   end
 
   def handle_cast({:answer, _}, %{mode: :single, current: nil} = state) do
-    IO.puts("⚠️ No hay pregunta activa en este momento.")
+    IO.puts(" No hay pregunta activa en este momento.")
     {:noreply, state}
   end
 

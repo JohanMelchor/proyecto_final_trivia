@@ -38,7 +38,7 @@ defmodule Trivia.UserManager do
     end
   end
 
-  # ✅ Alias semántico usado por SessionManager
+  # Alias semántico usado por SessionManager
   def authenticate(username, password), do: login(username, password)
 
   @doc """

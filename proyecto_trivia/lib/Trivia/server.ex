@@ -56,11 +56,11 @@ defmodule Trivia.Server do
 
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
-        IO.puts("🎯 Partida individual iniciada para #{username}")
+        IO.puts(" Partida individual iniciada para #{username}")
         {:ok, pid}
 
       {:error, reason} ->
-        IO.puts("❌ No se pudo iniciar la partida: #{inspect(reason)}")
+        IO.puts(" No se pudo iniciar la partida: #{inspect(reason)}")
         {:error, reason}
     end
   end
@@ -86,11 +86,11 @@ defmodule Trivia.Server do
 
     case DynamicSupervisor.start_child(__MODULE__, spec) do
       {:ok, pid} ->
-        IO.puts("🎮 Partida multijugador #{id} creada por #{owner}")
+        IO.puts(" Partida multijugador #{id} creada por #{owner}")
         {:ok, pid}
 
       {:error, reason} ->
-        IO.puts("❌ Error al crear partida: #{inspect(reason)}")
+        IO.puts(" Error al crear partida: #{inspect(reason)}")
         {:error, reason}
     end
   end

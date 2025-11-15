@@ -5,17 +5,17 @@ defmodule Trivia.CLI do
   # PUNTO DE ENTRADA
   # ===============================
   def start do
-    IO.puts("\n=== 🎮 Bienvenido  ===\n")
+    IO.puts("\n===  Bienvenido  ===\n")
     {:ok, _} = ensure_server_started()
     {:ok, _} = ensure_session_manager_started()
     auth_menu()
   end
 
-  # Solo inicia los procesos globales (modo backend)
+  # Solo inicia los procesos globales
   def start_server do
     {:ok, _} = ensure_session_manager_started()
     {:ok, _} = ensure_server_started()
-    IO.puts("\n=== 🌐 SERVIDOR DE TRIVIA INICIADO ===\n")
+    IO.puts("\n===  SERVIDOR DE TRIVIA INICIADO ===\n")
     IO.puts("Esperando jugadores remotos...\n")
     Process.sleep(:infinity)
   end
@@ -34,9 +34,9 @@ defmodule Trivia.CLI do
     case IO.gets("Seleccione una opción: ") |> String.trim() do
       "1" -> login_flow()
       "2" -> register_flow()
-      "3" -> IO.puts("👋 Hasta luego!")
+      "3" -> IO.puts(" Hasta luego!")
       _ ->
-        IO.puts("\n❌ Opción inválida.\n")
+        IO.puts("\n Opción inválida.\n")
         auth_menu()
     end
   end
@@ -47,11 +47,11 @@ defmodule Trivia.CLI do
 
     case SessionManager.connect(username, password, self()) do
       {:ok, _msg} ->
-        IO.puts("\n✅ Sesión iniciada correctamente.\n")
+        IO.puts("\n Sesión iniciada correctamente.\n")
         main_menu(username)
 
       {:error, reason} ->
-        IO.puts("\n❌ Error: #{inspect(reason)}\n")
+        IO.puts("\n Error: #{inspect(reason)}\n")
         auth_menu()
     end
   end
@@ -62,11 +62,11 @@ defmodule Trivia.CLI do
 
     case UserManager.register(username, password) do
       {:ok, _user} ->
-        IO.puts("✅ Usuario creado exitosamente.\n")
+        IO.puts(" Usuario creado exitosamente.\n")
         auth_menu()
 
       {:error, reason} ->
-        IO.puts("❌ Error: #{inspect(reason)}\n")
+        IO.puts(" Error: #{inspect(reason)}\n")
         auth_menu()
     end
   end
@@ -95,11 +95,11 @@ defmodule Trivia.CLI do
       "5" -> show_history(username)
       "6" ->
         SessionManager.disconnect(username)
-        IO.puts("👋 Sesión cerrada.\n")
+        IO.puts(" Sesión cerrada.\n")
         auth_menu()
 
       _ ->
-        IO.puts("\n❌ Opción inválida.\n")
+        IO.puts("\n Opción inválida.\n")
         main_menu(username)
     end
   end
@@ -109,7 +109,7 @@ defmodule Trivia.CLI do
   # ===============================
   defp multiplayer_menu(username) do
     IO.puts("""
-    === 🌐 MODO MULTIJUGADOR ===
+    ===  MODO MULTIJUGADOR ===
     1. Crear partida
     2. Unirse a partida
     3. Ver partidas activas
@@ -122,23 +122,23 @@ defmodule Trivia.CLI do
       "3" -> list_games_flow(username)
       "4" -> main_menu(username)
       _ ->
-        IO.puts("\n❌ Opción inválida.\n")
+        IO.puts("\n Opción inválida.\n")
         multiplayer_menu(username)
     end
   end
 
   defp create_game_flow(username) do
     if not SessionManager.online?(username) do
-      IO.puts("❌ Debes estar conectado al servidor.\n")
+      IO.puts(" Debes estar conectado al servidor.\n")
       main_menu(username)
     else
       categories = QuestionBank.load_categories()
 
       if categories == [] do
-        IO.puts("⚠️ No hay categorías disponibles.\n")
+        IO.puts(" No hay categorías disponibles.\n")
         main_menu(username)
       else
-        IO.puts("\n=== 🎮 Configuración de la partida multijugador ===\n")
+        IO.puts("\n===  Configuración de la partida multijugador ===\n")
 
         # Mostrar categorías disponibles con numeración
         Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
@@ -154,19 +154,19 @@ defmodule Trivia.CLI do
 
         case Trivia.Lobby.create_game(id, username, category, num, time) do
           {:ok, _pid} ->
-            IO.puts("\n✅ Partida #{id} creada correctamente!")
+            IO.puts("\n Partida #{id} creada correctamente!")
             host_lobby_menu(id, username)
 
           {:error, :invalid_user} ->
-            IO.puts("❌ El usuario no está conectado.\n")
+            IO.puts(" El usuario no está conectado.\n")
             multiplayer_menu(username)
 
           {:error, :invalid_category} ->
-            IO.puts("⚠️ Categoría inválida.\n")
+            IO.puts(" Categoría inválida.\n")
             multiplayer_menu(username)
 
           {:error, reason} ->
-            IO.puts("❌ Error al crear partida: #{inspect(reason)}\n")
+            IO.puts(" Error al crear partida: #{inspect(reason)}\n")
             multiplayer_menu(username)
         end
       end
@@ -177,15 +177,15 @@ defmodule Trivia.CLI do
     id = pedir_numero("ID de partida:", 0)
     case Trivia.Lobby.join_game(id, username, self()) do
       {:ok, msg} ->
-        IO.puts("✅ #{msg}")
+        IO.puts(" #{msg}")
         guest_lobby_menu(id, username)
 
       {:error, :not_found} ->
-        IO.puts("❌ No existe una partida con ese ID.\n")
+        IO.puts(" No existe una partida con ese ID.\n")
         multiplayer_menu(username)
 
       {:error, reason} ->
-        IO.puts("❌ Error: #{inspect(reason)}\n")
+        IO.puts(" Error: #{inspect(reason)}\n")
         multiplayer_menu(username)
     end
   end
@@ -193,11 +193,19 @@ defmodule Trivia.CLI do
   defp list_games_flow(username) do
     IO.puts("\n=== Partidas activas ===")
     games = Server.list_games()
+
     if games == [] do
       IO.puts("No hay partidas disponibles.\n")
     else
-      Enum.each(games, fn id -> IO.puts("• ID: #{id}") end)
+      Enum.each(games, fn id ->
+        # Verificar que el lobby sigue activo antes de mostrar
+        case :global.whereis_name({:lobby, id}) do
+          :undefined -> :ok  # Lobby terminado, no mostrar
+          _pid -> IO.puts("• ID: #{id}")
+        end
+      end)
     end
+
     multiplayer_menu(username)
   end
 
@@ -205,18 +213,18 @@ defmodule Trivia.CLI do
   # LOBBY
   # ===============================
   defp host_lobby_menu(id, username) do
-    IO.puts("\n=== 🎮 Lobby #{id} (Host: #{username}) ===")
+    IO.puts("\n===  Lobby #{id} (Host: #{username}) ===")
     IO.puts("1. Iniciar partida")
     IO.puts("2. Cancelar partida")
 
     case IO.gets("Seleccione: ") |> String.trim() do
       "1" ->
         Trivia.Lobby.start_game(id)
-        IO.puts("🚀 Partida iniciada! Espera las preguntas...\n")
-        listen_multiplayer(id, username)  # ⬅️ Pasar id y username
+        IO.puts(" Partida iniciada! Espera las preguntas...\n")
+        listen_multiplayer(id, username)  #  Pasar id y username
       "2" ->
         Trivia.Lobby.cancel_game(id)
-        IO.puts("❌ Partida cancelada.\n")
+        IO.puts(" Partida cancelada.\n")
         multiplayer_menu(username)
       _ ->
         host_lobby_menu(id, username)
@@ -227,7 +235,7 @@ defmodule Trivia.CLI do
     # Limpiar mensajes pendientes (evita que mensajes del lobby anterior se mezclen)
     flush_mailbox()
 
-    IO.puts("\n=== 🕒 Esperando inicio de partida #{id} ===")
+    IO.puts("\n===  Esperando inicio de partida #{id} ===")
     IO.puts("1. Abandonar partida")
 
     parent = self()
@@ -259,12 +267,12 @@ defmodule Trivia.CLI do
   # PARTIDA INDIVIDUAL
   # ===============================
   defp start_single_game(username) do
-    IO.puts("\n=== 🎯 Configuración de partida individual ===\n")
+    IO.puts("\n===  Configuración de partida individual ===\n")
 
     categories = QuestionBank.load_categories()
 
     if categories == [] do
-      IO.puts("⚠️ No hay categorías disponibles.\n")
+      IO.puts(" No hay categorías disponibles.\n")
       main_menu(username)
     else
       Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
@@ -283,11 +291,11 @@ defmodule Trivia.CLI do
             mode: :single
           }) do
         {:ok, pid} ->
-          IO.puts("✅ Partida iniciada correctamente!\n")
+          IO.puts(" Partida iniciada correctamente!\n")
           play_game(pid, username)
 
         {:error, reason} ->
-          IO.puts("❌ No se pudo iniciar el juego: #{inspect(reason)}")
+          IO.puts(" No se pudo iniciar el juego: #{inspect(reason)}")
           main_menu(username)
       end
     end
@@ -297,7 +305,7 @@ defmodule Trivia.CLI do
     receive do
       {:question, question, options} ->
         IO.puts("\n" <> String.duplicate("=", 50))
-        IO.puts("❓ #{question}")
+        IO.puts(" #{question}")
         IO.puts(String.duplicate("-", 50))
         Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
@@ -313,15 +321,15 @@ defmodule Trivia.CLI do
         play_game(pid, username)
 
       {:timeout_notice, correct_answer} ->
-        IO.puts("\n⏰ Tiempo agotado! La respuesta correcta era: #{correct_answer}")
-        IO.puts("🔄 Pasando a la siguiente pregunta...")
+        IO.puts("\n Tiempo agotado! La respuesta correcta era: #{correct_answer}")
+        IO.puts(" Pasando a la siguiente pregunta...")
         play_game(pid, username)
 
       {:game_over, score} ->
-        IO.puts("\n" <> String.duplicate("🎉", 20))
-        IO.puts("🏁 ¡FIN DEL JUEGO!")
-        IO.puts("📊 Puntaje final: #{score} puntos")
-        IO.puts(String.duplicate("🎉", 20))
+        IO.puts("\n" <> String.duplicate("=", 15))
+        IO.puts(" ¡FIN DEL JUEGO!")
+        IO.puts(" Puntaje final: #{score} puntos")
+        IO.puts(String.duplicate("=", 15))
         IO.puts("\n")
         main_menu(username)
 
@@ -330,7 +338,7 @@ defmodule Trivia.CLI do
         play_game(pid, username)
     after
       300_000 ->
-        IO.puts("\n⏰ Tiempo de inactividad excedido. Partida cancelada.")
+        IO.puts("\n Tiempo de inactividad excedido. Partida cancelada.")
         main_menu(username)
     end
   end
@@ -343,8 +351,8 @@ defmodule Trivia.CLI do
     if answer in ["a", "b", "c", "d"] do
       Game.answer(pid, answer)
     else
-      IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-      capture_single_answer(pid)  # ⬅️ Reintentar recursivamente
+      IO.puts(" Respuesta inválida. Usa a, b, c o d.")
+      capture_single_answer(pid)  #  Reintentar recursivamente
     end
   end
 
@@ -354,7 +362,7 @@ defmodule Trivia.CLI do
   defp seleccionar_opcion(categories) do
     opt = IO.gets("\nSeleccione una categoría: ") |> String.trim()
     case Integer.parse(opt) do
-      {n, _} when n in 1..length(categories)//1 ->  # ⬅️ Corregir el warning del rango
+      {n, _} when n in 1..length(categories)//1 ->  #  Corregir el warning del rango
         Enum.at(categories, n - 1)
       _ ->
         hd(categories)
@@ -371,7 +379,7 @@ defmodule Trivia.CLI do
   defp show_score(username) do
     case UserManager.get_score(username) do
       {:ok, score} -> IO.puts("\nTu Puntaje actual: #{score}\n")
-      _ -> IO.puts("\n⚠️ Usuario no encontrado o error.\n")
+      _ -> IO.puts("\n Usuario no encontrado o error.\n")
     end
     main_menu(username)
   end
@@ -379,9 +387,9 @@ defmodule Trivia.CLI do
   def show_ranking(username) do
     users = UserManager.load_users()
     if users == [] do
-      IO.puts("\n⚠️ No hay usuarios registrados todavía.\n")
+      IO.puts("\n No hay usuarios registrados todavía.\n")
     else
-      IO.puts("\n=== 🏆 RANKING GENERAL ===\n")
+      IO.puts("\n===  RANKING GENERAL ===\n")
       users
       |> Enum.sort_by(&(-&1["score"]))
       |> Enum.with_index(1)
@@ -393,7 +401,7 @@ defmodule Trivia.CLI do
   end
 
   def show_history(username) do
-    IO.puts("\n=== 🕑 Historial de Partidas ===\n")
+    IO.puts("\n=== Historial de Partidas ===\n")
     Trivia.History.show_last(10)
     IO.puts("\n=================================\n")
     main_menu(username)
@@ -420,7 +428,11 @@ defmodule Trivia.CLI do
       {:leave_lobby, ^id, _user} ->
         # Sólo actúa si el mensaje corresponde al lobby actual
         Trivia.Lobby.leave_game(id, username)
-        IO.puts("\n✅ Has abandonado la partida\n")
+        IO.puts("\nHas abandonado la partida\n")
+        multiplayer_menu(username)
+
+      {:lobby_canceled, ^id} ->
+        IO.puts("\nEl host canceló la partida. Volviendo al menú multijugador...\n")
         multiplayer_menu(username)
 
       {:guest_input_invalid, ^id} ->
@@ -429,21 +441,21 @@ defmodule Trivia.CLI do
 
       # ... rest of messages ...
       {:game_message, msg} ->
-        IO.puts("\n📢 #{msg}")
+        IO.puts("\n #{msg}")
         listen_multiplayer(id, username)
 
       {:question_summary, summary} ->
         IO.puts("\n" <> String.duplicate("=", 50))
-        IO.puts("📊 RESUMEN DE RESPUESTAS:")
+        IO.puts(" RESUMEN DE RESPUESTAS:")
         IO.puts(String.duplicate("-", 50))
         Enum.each(summary, fn
           {user, :timeout, _correct, delta} ->
-            IO.puts("#{user}: ❌ tiempo agotado (#{delta} pts)")
+            IO.puts("#{user}: tiempo agotado (#{delta} pts)")
           {user, :answered, correct, delta} ->
-            status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
+            status = if correct, do: " Correcto", else: " Incorrecto"
             IO.puts("#{user}: #{status} (#{delta} pts)")
           {user, _other, correct, delta} ->
-            status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
+            status = if correct, do: " Correcto", else: " Incorrecto"
             IO.puts("#{user}: #{status} (#{delta} pts)")
         end)
         IO.puts(String.duplicate("=", 50))
@@ -451,7 +463,7 @@ defmodule Trivia.CLI do
 
       {:question, question, options} ->
         IO.puts("\n" <> String.duplicate("=", 50))
-        IO.puts("❓ #{question}")
+        IO.puts(" #{question}")
         IO.puts(String.duplicate("-", 50))
         Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
@@ -464,29 +476,29 @@ defmodule Trivia.CLI do
       {:player_answered, user, reason, correct, delta} ->
         case reason do
           :timeout ->
-            IO.puts("#{user}: ❌ tiempo agotado (#{delta} pts)")
+            IO.puts("#{user}:  tiempo agotado (#{delta} pts)")
           :answered ->
-            IO.puts("#{user}: #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+            IO.puts("#{user}: #{if correct, do: " Correcto", else: " Incorrecto"} (#{delta} pts)")
           _ ->
-            IO.puts("#{user}: #{if correct, do: "✅ Correcto", else: "❌ Incorrecto"} (#{delta} pts)")
+            IO.puts("#{user}: #{if correct, do: " Correcto", else: " Incorrecto"} (#{delta} pts)")
         end
         listen_multiplayer(id, username)
 
       {:timeout, _} ->
-        IO.puts("⏰ Tiempo agotado! Siguiente pregunta...")
+        IO.puts(" Tiempo agotado! Siguiente pregunta...")
         listen_multiplayer(id, username)
 
       {:game_over, players} ->
-        IO.puts("\n" <> String.duplicate("🎉", 20))
-        IO.puts("🏁 ¡FIN DE LA PARTIDA MULTIJUGADOR!")
+        IO.puts("\n" <> String.duplicate("Bieen", 20))
+        IO.puts(" ¡FIN DE LA PARTIDA MULTIJUGADOR!")
         IO.puts(String.duplicate("-", 50))
         Enum.each(players, fn {u, %{score: s}} -> IO.puts("#{u}: #{s} puntos") end)
-        IO.puts(String.duplicate("🎉", 20))
+        IO.puts(String.duplicate("Bieen", 20))
         multiplayer_menu(username)
 
       {:question, q} when is_map(q) ->
         IO.puts("\n" <> String.duplicate("=", 50))
-        IO.puts("❓ #{q["question"]}")
+        IO.puts(" #{q["question"]}")
         IO.puts(String.duplicate("-", 50))
         Enum.each(q["options"], fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
@@ -500,7 +512,7 @@ defmodule Trivia.CLI do
         listen_multiplayer(id, username)
     after
       300_000 ->
-        IO.puts("\n⏰ Desconectado por inactividad.")
+        IO.puts("\n Desconectado por inactividad.")
         multiplayer_menu(username)
     end
   end
@@ -510,7 +522,7 @@ defmodule Trivia.CLI do
 
     case IO.read(:line) do
       :eof ->
-        IO.puts("\n❌ Error de entrada")
+        IO.puts("\n Error de entrada")
         capture_answer(id, username, parent_pid)
 
       answer when is_binary(answer) ->
@@ -522,7 +534,7 @@ defmodule Trivia.CLI do
               {:ok, game_pid} ->
                 GenServer.cast(game_pid, {:answer, username, answer})
               {:error, reason} ->
-                IO.puts("❌ Error al enviar respuesta: #{reason}")
+                IO.puts(" Error al enviar respuesta: #{reason}")
             end
 
           answer == "/salir" ->
@@ -531,12 +543,12 @@ defmodule Trivia.CLI do
             :ok
 
           true ->
-            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+            IO.puts(" Respuesta inválida. Usa a, b, c o d.")
             capture_answer(id, username, parent_pid)
         end
 
       _ ->
-        IO.puts("❌ Error de entrada")
+        IO.puts(" Error de entrada")
         capture_answer(id, username, parent_pid)
     end
   end

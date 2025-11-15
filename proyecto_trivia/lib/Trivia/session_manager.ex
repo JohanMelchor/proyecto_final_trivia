@@ -3,7 +3,7 @@ defmodule Trivia.SessionManager do
   Gestiona las sesiones de los usuarios conectados al servidor.
   Cada sesión se asocia al nombre de usuario y su PID de CLI.
 
-  ✅ Modo distribuido (global):
+   Modo distribuido (global):
   - Se registra globalmente con {:global, Trivia.SessionManager}.
   - Los clientes remotos pueden autenticarse, desconectarse o consultar usuarios en línea.
   """
@@ -19,22 +19,22 @@ defmodule Trivia.SessionManager do
     GenServer.start_link(__MODULE__, %{}, name: {:global, __MODULE__})
   end
 
-  # 🔹 Conectar usuario (ya registrado)
+  #  Conectar usuario (ya registrado)
   def connect(username, password, caller) do
     GenServer.call({:global, __MODULE__}, {:connect, username, password, caller})
   end
 
-  # 🔹 Desconectar usuario
+  #  Desconectar usuario
   def disconnect(username) do
     GenServer.call({:global, __MODULE__}, {:disconnect, username})
   end
 
-  # 🔹 Listar usuarios en línea
+  #  Listar usuarios en línea
   def list_online do
     GenServer.call({:global, __MODULE__}, :list_online)
   end
 
-  # 🔹 Verificar si un usuario está conectado
+  #  Verificar si un usuario está conectado
   def online?(username) do
     GenServer.call({:global, __MODULE__}, {:check_online, username})
   end
@@ -45,38 +45,38 @@ defmodule Trivia.SessionManager do
 
   @impl true
   def init(_args) do
-    IO.puts("🌐 Servidor global de sesiones iniciado.")
+    IO.puts(" Servidor global de sesiones iniciado.")
     {:ok, %{}}
   end
 
-  # ✅ LOGIN (no registra nuevos usuarios)
+  # LOGIN
   @impl true
   def handle_call({:connect, username, password, caller}, _from, state) do
     case UserManager.authenticate(username, password) do
       {:ok, _user} ->
-        IO.puts("✅ #{username} conectado desde #{inspect(node(caller))}")
+        IO.puts(" #{username} conectado desde #{inspect(node(caller))}")
         new_state = Map.put(state, username, %{pid: caller, status: :online})
         {:reply, {:ok, "Conectado exitosamente"}, new_state}
 
       {:error, reason} ->
-        IO.puts("❌ Falló el inicio de sesión para #{username}: #{reason}")
+        IO.puts(" Falló el inicio de sesión para #{username}: #{reason}")
         {:reply, {:error, reason}, state}
     end
   end
 
 
-  # 🔻 Desconectar usuario
+  #  Desconectar usuario
   @impl true
   def handle_call({:disconnect, username}, _from, state) do
     if Map.has_key?(state, username) do
-      IO.puts("👋 #{username} se desconectó.")
+      IO.puts(" #{username} se desconectó.")
       {:reply, :ok, Map.delete(state, username)}
     else
       {:reply, {:error, "Usuario no conectado"}, state}
     end
   end
 
-  # 🔹 Listar usuarios en línea
+  # Listar usuarios en línea
   @impl true
   def handle_call(:list_online, _from, state) do
     users =
@@ -88,7 +88,7 @@ defmodule Trivia.SessionManager do
     {:reply, users, state}
   end
 
-  # 🔹 Verificar conexión
+  # Verificar conexión
   @impl true
   def handle_call({:check_online, username}, _from, state) do
     {:reply, Map.has_key?(state, username), state}
