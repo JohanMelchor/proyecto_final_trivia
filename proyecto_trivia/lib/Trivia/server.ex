@@ -14,7 +14,13 @@ defmodule Trivia.Server do
   # ===============================
 
   def start_link(_args) do
-    DynamicSupervisor.start_link(__MODULE__, :ok, name: __MODULE__)
+    # Similar: si ya existe, reutilizar en lugar de fallar
+    case GenServer.whereis(__MODULE__) do
+      nil ->
+        DynamicSupervisor.start_link(__MODULE__, :ok, name: __MODULE__)
+      pid when is_pid(pid) ->
+        {:ok, pid}
+    end
   end
 
   @impl true

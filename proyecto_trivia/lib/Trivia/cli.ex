@@ -177,6 +177,17 @@ defmodule Trivia.CLI do
       {:ok, msg} ->
         IO.puts(" #{msg}")
         guest_lobby_menu(id, username)
+      {:error, :full} ->
+        IO.puts("\n❌ La partida está llena (máximo 4 jugadores)\n")
+        multiplayer_menu(username)
+
+      {:error, :started} ->
+        IO.puts("\n❌ La partida ya ha iniciado, no puedes unirte\n")
+        multiplayer_menu(username)
+
+      {:error, :already} ->
+        IO.puts("\n❌ Ya estás en esta partida\n")
+        multiplayer_menu(username)
 
       {:error, :not_found} ->
         IO.puts(" No existe una partida con ese ID.\n")
@@ -324,10 +335,10 @@ defmodule Trivia.CLI do
         play_game(pid, username)
 
       {:game_over, score} ->
-        IO.puts("\n" <> String.duplicate("=", 15))
+        IO.puts("\n" <> String.duplicate("=", 50))
         IO.puts(" ¡FIN DEL JUEGO!")
         IO.puts(" Puntaje final: #{score} puntos")
-        IO.puts(String.duplicate("=", 15))
+        IO.puts(String.duplicate("=", 50))
         IO.puts("\n")
         main_menu(username)
 
@@ -473,11 +484,11 @@ defmodule Trivia.CLI do
         listen_multiplayer(id, username)
 
       {:game_over, players} ->
-        IO.puts("\n" <> String.duplicate("=", 15))
+        IO.puts("\n" <> String.duplicate("=", 50))
         IO.puts(" ¡FIN DE LA PARTIDA MULTIJUGADOR!")
         IO.puts(String.duplicate("-", 50))
         Enum.each(players, fn {u, %{score: s}} -> IO.puts("#{u}: #{s} puntos") end)
-        IO.puts(String.duplicate("=", 15))
+        IO.puts(String.duplicate("=", 50))
         multiplayer_menu(username)
 
       {:question, q} when is_map(q) ->

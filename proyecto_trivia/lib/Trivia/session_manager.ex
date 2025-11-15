@@ -16,7 +16,13 @@ defmodule Trivia.SessionManager do
   # ===============================
 
   def start_link(_args) do
-    GenServer.start_link(__MODULE__, %{}, name: {:global, __MODULE__})
+    # Si ya existe globalmente, devolver {:ok, pid_existente} en lugar de error
+    case :global.whereis_name(__MODULE__) do
+      :undefined ->
+        GenServer.start_link(__MODULE__, %{}, name: {:global, __MODULE__})
+      pid when is_pid(pid) ->
+        {:ok, pid}
+    end
   end
 
   #  Conectar usuario (ya registrado)
