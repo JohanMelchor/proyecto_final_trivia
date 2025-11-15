@@ -432,13 +432,13 @@
       "answer": "c"
     },
     {
-      "question": "¿Qué serie de Netflix trata sobre un mundo distópico con números?",
+      "question": "¿Qué serie de Netflix narra la vida de la reina Isabel II?",
       "options": { "a": "The Crown", "b": "Stranger Things", "c": "Squid Game", "d": "Bridgerton" },
-      "answer": "c"
+      "answer": "a"
     },
     {
-      "question": "¿Qué película de superhéroes presenta el personaje de Black Panther?",
-      "options": { "a": "Avengers: Endgame", "b": "Black Panther", "c": "Captain America: Civil War", "d": "Thor: Ragnarok" },
+      "question": "¿Qué película de superhéroes fue la mas taquillera en su género?",
+      "options": { "a": "Avengers: Endgame", "b": "Guardians of the Galaxy Vol. 2", "c": "Captain America: Civil War", "d": "Spiderman: No Way Home" },
       "answer": "b"
     },
     {

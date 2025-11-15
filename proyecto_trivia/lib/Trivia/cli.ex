@@ -304,41 +304,12 @@ defmodule Trivia.CLI do
 
         # Pedir respuesta en un proceso separado para no bloquear
         spawn(fn ->
-          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
-                  |> String.trim()
-                  |> String.downcase()
-
-          # Validar respuesta
-          if answer in ["a", "b", "c", "d"] do
-            Game.answer(pid, answer)
-          else
-            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-            # Reintentar
-            send(self(), {:retry_question, pid})
-          end
-        end)
-
-        play_game(pid, username)
-
-      {:retry_question, pid} ->
-        # Volver a pedir respuesta para la misma pregunta
-        spawn(fn ->
-          answer = IO.gets("\nTu respuesta (a, b, c, d): ")
-                  |> String.trim()
-                  |> String.downcase()
-
-          if answer in ["a", "b", "c", "d"] do
-            Game.answer(pid, answer)
-          else
-            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-            send(self(), {:retry_question, pid})
-          end
+          capture_single_answer(pid)
         end)
 
         play_game(pid, username)
 
       {:feedback, correct, delta} ->
-        # Este mensaje ahora es informativo, ya mostramos el feedback en game.ex
         play_game(pid, username)
 
       {:timeout_notice, correct_answer} ->
@@ -358,10 +329,22 @@ defmodule Trivia.CLI do
         IO.puts("Mensaje inesperado: #{inspect(unexpected)}")
         play_game(pid, username)
     after
-      # Timeout general de seguridad (5 minutos)
       300_000 ->
         IO.puts("\n⏰ Tiempo de inactividad excedido. Partida cancelada.")
         main_menu(username)
+    end
+  end
+
+  defp capture_single_answer(pid) do
+    answer = IO.gets("\nTu respuesta (a, b, c, d): ")
+             |> String.trim()
+             |> String.downcase()
+
+    if answer in ["a", "b", "c", "d"] do
+      Game.answer(pid, answer)
+    else
+      IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+      capture_single_answer(pid)  # ⬅️ Reintentar recursivamente
     end
   end
 
