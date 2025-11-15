@@ -489,11 +489,11 @@ defmodule Trivia.CLI do
         listen_multiplayer(id, username)
 
       {:game_over, players} ->
-        IO.puts("\n" <> String.duplicate("Bieen", 20))
+        IO.puts("\n" <> String.duplicate("=", 15))
         IO.puts(" ¡FIN DE LA PARTIDA MULTIJUGADOR!")
         IO.puts(String.duplicate("-", 50))
         Enum.each(players, fn {u, %{score: s}} -> IO.puts("#{u}: #{s} puntos") end)
-        IO.puts(String.duplicate("Bieen", 20))
+        IO.puts(String.duplicate("=", 15))
         multiplayer_menu(username)
 
       {:question, q} when is_map(q) ->

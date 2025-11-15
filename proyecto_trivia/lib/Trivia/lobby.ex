@@ -145,7 +145,7 @@ defmodule Trivia.Lobby do
         {:reply, {:error, :already}, state}
 
       true ->
-        send_message_to_all(state.players, " #{username} se unió a la partida.")
+        send_message_to_all(state.players, {:game_message, "#{username} se unió a la partida."})
         IO.puts(" #{username} se unió al lobby #{state.id}")
         monitor = Process.monitor(caller)
         new_players = Map.put(state.players, username, %{pid: caller, score: 0, answered: false})
@@ -158,7 +158,7 @@ defmodule Trivia.Lobby do
   @impl true
   def handle_cast({:leave, username}, state) do
     if Map.has_key?(state.players, username) do
-      send_message_to_all(state.players, " #{username} abandonó la partida.")
+      send_message_to_all(state.players, {:game_message, "#{username} abandonó la partida."})
       IO.puts(" #{username} salió del lobby #{state.id}")
       new_state = %{state | players: Map.delete(state.players, username)}
       {:noreply, new_state}
@@ -187,7 +187,7 @@ defmodule Trivia.Lobby do
         time: state.time
       })
 
-    send_message_to_all(state.players, " ¡Partida iniciada!")
+    send_message_to_all(state.players, {:game_message, "¡Partida iniciada!"})
     IO.puts(" Partida del lobby #{state.id} iniciada.")
     {:noreply, %{state | started: true, game_pid: game_pid, timer_ref: nil}}
   end
@@ -202,14 +202,12 @@ defmodule Trivia.Lobby do
       Process.exit(state.game_pid, :normal)
     end
 
-    send_message_to_all(state.players, " El host canceló la partida.")
-    # Notificar solo a los invitados (excluir al host para evitar que reciba doble acción)
+    # notificar a invitados con mensaje de cancelación (tuple que obliga al guest a volver)
     other_players = Map.drop(state.players || %{}, [state.owner])
     send_message_to_all(other_players, {:lobby_canceled, state.id})
 
     IO.puts(" Lobby #{state.id} cancelado por el host.")
 
-    # ⬇️ ASEGURAR QUE SE DETIENE COMPLETAMENTE
     {:stop, :normal, state}
   end
 
@@ -217,7 +215,7 @@ defmodule Trivia.Lobby do
   def handle_info(:timeout_lobby, state) do
     unless state.started do
       IO.puts(" Lobby #{state.id} cerrado por inactividad.")
-      send_message_to_all(state.players, " El lobby fue cerrado por inactividad.")
+      send_message_to_all(state.players, {:game_message, "El lobby fue cerrado por inactividad."})
       {:stop, :normal, state}
     else
       {:noreply, state}
@@ -229,16 +227,13 @@ defmodule Trivia.Lobby do
     case Enum.find(state.monitors || %{}, fn {_user, mref} -> mref == ref end) do
       {username, _} ->
         IO.puts(" PID no válido o proceso muerto para #{username}")
-        # eliminar monitor y jugador
         new_monitors = Map.drop(state.monitors || %{}, [username])
         new_players = Map.delete(state.players, username)
-        # notificar a los demás
-        send_message_to_all(new_players, " #{username} se desconectó.")
-        # si el juego ya empezó, avisar al Game para forzar timeout de ese jugador
+        # enviar mensaje estructurado
+        send_message_to_all(new_players, {:game_message, "#{username} se desconectó."})
         if state.started && state.game_pid do
           GenServer.cast(state.game_pid, {:player_disconnected, username})
         end
-        # si no quedan jugadores, cerrar lobby
         if map_size(new_players) == 0 do
           {:stop, :normal, %{state | players: new_players, monitors: new_monitors}}
         else
