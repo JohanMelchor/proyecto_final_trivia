@@ -49,7 +49,8 @@ defmodule Trivia.Game do
         questions: questions,
         current: nil,
         time: args.time,
-        timer_ref: nil
+        timer_ref: nil,
+        current_responses: []
       }
 
       Process.send_after(self(), :next_question, 500)
@@ -59,7 +60,6 @@ defmodule Trivia.Game do
 
   @impl true
   def init(%{mode: :single, username: username, category: category, num: num, time: time, caller: caller}) do
-    IO.puts("\n🎮 Iniciando partida de #{username} en '#{category}' (singleplayer)...\n")
 
     questions = QuestionBank.get_random_questions(category, num)
 
@@ -99,6 +99,10 @@ defmodule Trivia.Game do
   end
 
   def handle_info(:next_question, %{mode: :multi, questions: [q | rest]} = state) do
+    IO.puts("\n==================================")
+    IO.puts("Lobby - Pregunta #{length(rest) + 1}/#{length(rest) + state.question_number}")
+    IO.puts("Categoría: #{state.category}")
+    IO.puts("==================================")
     # ⬇️ RESETEAR ESTADO DE RESPUESTAS PARA NUEVA PREGUNTA
      reset_players =
       Enum.into(state.players, %{}, fn {username, data} ->
@@ -224,17 +228,22 @@ defmodule Trivia.Game do
             %{p | score: p.score + delta, answered: true}
           end)
 
-        send(state.lobby_pid, {:player_answered, username, correct, delta})
+        new_responses = [{username, correct, delta} | state.current_responses]
 
         # Verificar si todos respondieron
         all_answered = Enum.all?(updated_players, fn {_, p} -> p.answered end)
 
-        if all_answered && state.timer_ref do
-          Process.cancel_timer(state.timer_ref)
+        if all_answered do
+          # ⬇️ ENVIAR RESUMEN CUANDO TODOS HAYAN RESPONDIDO
+          send(state.lobby_pid, {:question_summary, new_responses})
+
+          if state.timer_ref do
+            Process.cancel_timer(state.timer_ref)
+          end
           Process.send_after(self(), :next_question, 2000)
         end
 
-        {:noreply, %{state | players: updated_players}}
+        {:noreply, %{state | players: updated_players, current_responses: new_responses}}
       end
     else
       {:noreply, state}
@@ -257,14 +266,6 @@ defmodule Trivia.Game do
     # Calcular puntaje
     delta = if is_correct, do: 5, else: -3
     new_score = state.score + delta
-
-    # Feedback inmediato
-    IO.puts(if is_correct, do: "✅ Correcto! +#{delta} puntos", else: "❌ Incorrecto! #{delta} puntos")
-    IO.puts("📊 Puntaje actual: #{new_score}")
-
-    if not is_correct do
-      IO.puts("💡 La respuesta correcta era: #{q["answer"]}")
-    end
 
     # Enviar feedback al CLI
     if state.caller do

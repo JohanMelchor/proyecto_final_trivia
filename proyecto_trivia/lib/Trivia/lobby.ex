@@ -193,13 +193,19 @@ defmodule Trivia.Lobby do
 
   @impl true
   def handle_cast(:cancel, state) do
-    # ⬇️ CANCELAR TIMER DE INACTIVIDAD
+    # ⬇️ CANCELAR TIMER Y DETENER JUEGO SI EXISTE
     if state.timer_ref do
       Process.cancel_timer(state.timer_ref)
     end
 
+    if state.game_pid do
+      Process.exit(state.game_pid, :normal)
+    end
+
     send_message_to_all(state.players, "❌ El host canceló la partida.")
     IO.puts("❌ Lobby #{state.id} cancelado por el host.")
+
+    # ⬇️ ASEGURAR QUE SE DETIENE COMPLETAMENTE
     {:stop, :normal, state}
   end
 
@@ -225,10 +231,11 @@ defmodule Trivia.Lobby do
   end
 
   def handle_info({:player_answered, username, correct, delta}, state) do
-    send_message_to_all(
-      state.players,
-      {:player_answered, username, correct, delta}
-    )
+    {:noreply, state}
+  end
+
+  def handle_info({:question_summary, summary}, state) do
+    send_message_to_all(state.players, {:question_summary, summary})
     {:noreply, state}
   end
 

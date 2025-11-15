@@ -224,14 +224,35 @@ defmodule Trivia.CLI do
   end
 
   defp guest_lobby_menu(id, username) do
+    # Limpiar mensajes pendientes (evita que mensajes del lobby anterior se mezclen)
+    flush_mailbox()
+
     IO.puts("\n=== 🕒 Esperando inicio de partida #{id} ===")
-    IO.puts("Escribe 'salir' para abandonar la partida")
+    IO.puts("1. Abandonar partida")
 
-    # Escuchar mensajes del juego
+    parent = self()
+
+    # Spawn sólo para leer la entrada y notificar al proceso principal.
+    spawn(fn ->
+      case IO.gets("Opción: ") |> handle_input() do
+        "1" ->
+          # Enviar mensaje con el id del lobby para evitar mezclar con lobbies anteriores
+          send(parent, {:leave_lobby, id, username})
+        _ ->
+          # Notificar entrada inválida (se ignora si ya no corresponde al lobby)
+          send(parent, {:guest_input_invalid, id})
+      end
+    end)
+
     listen_multiplayer(id, username)
-
-    # Si sale de listen_multiplayer, volver al menú
-    multiplayer_menu(username)
+  end
+  # vacía el mailbox del proceso para evitar usar mensajes viejos
+  defp flush_mailbox do
+    receive do
+      _ -> flush_mailbox()
+    after
+      0 -> :ok
+    end
   end
 
   # ===============================
@@ -413,8 +434,30 @@ defmodule Trivia.CLI do
 
   defp listen_multiplayer(id, username) do
     receive do
+      {:leave_lobby, ^id, _user} ->
+        # Sólo actúa si el mensaje corresponde al lobby actual
+        Trivia.Lobby.leave_game(id, username)
+        IO.puts("\n✅ Has abandonado la partida\n")
+        multiplayer_menu(username)
+
+      {:guest_input_invalid, ^id} ->
+        # Ignorar y seguir escuchando (usuario puede reingresar)
+        listen_multiplayer(id, username)
+
+      # ... rest of messages ...
       {:game_message, msg} ->
         IO.puts("\n📢 #{msg}")
+        listen_multiplayer(id, username)
+
+      {:question_summary, summary} ->
+        IO.puts("\n" <> String.duplicate("=", 50))
+        IO.puts("📊 RESUMEN DE RESPUESTAS:")
+        IO.puts(String.duplicate("-", 50))
+        Enum.each(summary, fn {user, correct, delta} ->
+          status = if correct, do: "✅ Correcto", else: "❌ Incorrecto"
+          IO.puts("#{user}: #{status} (#{delta} pts)")
+        end)
+        IO.puts(String.duplicate("=", 50))
         listen_multiplayer(id, username)
 
       {:question, question, options} ->
@@ -424,10 +467,8 @@ defmodule Trivia.CLI do
         Enum.each(options, fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
 
-        # ⬇️ CAPTURAR RESPUESTA INMEDIATAMENTE
-        spawn(fn ->
-          capture_answer(id, username)
-        end)
+        # pasar el pid del proceso principal para que capture_answer pueda notificarle
+        spawn(fn -> capture_answer(id, username, self()) end)
 
         listen_multiplayer(id, username)
 
@@ -443,13 +484,10 @@ defmodule Trivia.CLI do
         IO.puts("\n" <> String.duplicate("🎉", 20))
         IO.puts("🏁 ¡FIN DE LA PARTIDA MULTIJUGADOR!")
         IO.puts(String.duplicate("-", 50))
-        Enum.each(players, fn {u, %{score: s}} ->
-          IO.puts("#{u}: #{s} puntos")
-        end)
+        Enum.each(players, fn {u, %{score: s}} -> IO.puts("#{u}: #{s} puntos") end)
         IO.puts(String.duplicate("🎉", 20))
         multiplayer_menu(username)
 
-      # Manejar mensaje de pregunta del formato antiguo (backward compatibility)
       {:question, q} when is_map(q) ->
         IO.puts("\n" <> String.duplicate("=", 50))
         IO.puts("❓ #{q["question"]}")
@@ -457,9 +495,7 @@ defmodule Trivia.CLI do
         Enum.each(q["options"], fn {k, v} -> IO.puts("#{k}. #{v}") end)
         IO.puts(String.duplicate("=", 50))
 
-        spawn(fn ->
-          capture_answer(id, username)
-        end)
+        spawn(fn -> capture_answer(id, username, self()) end)
 
         listen_multiplayer(id, username)
 
@@ -467,50 +503,45 @@ defmodule Trivia.CLI do
         IO.puts("Mensaje inesperado en multiplayer: #{inspect(unexpected)}")
         listen_multiplayer(id, username)
     after
-      300_000 ->  # 5 minutos de timeout general
+      300_000 ->
         IO.puts("\n⏰ Desconectado por inactividad.")
         multiplayer_menu(username)
     end
   end
 
-  defp capture_answer(id, username) do
+  defp capture_answer(id, username, parent_pid) do
     IO.write("Tu respuesta (a, b, c, d): ")
 
     case IO.read(:line) do
       :eof ->
         IO.puts("\n❌ Error de entrada")
+        capture_answer(id, username, parent_pid)
 
       answer when is_binary(answer) ->
         answer = answer |> String.trim() |> String.downcase()
 
         cond do
           answer in ["a", "b", "c", "d"] ->
-            # Enviar respuesta al juego
             case get_game_pid_from_lobby(id) do
               {:ok, game_pid} ->
-                # ⬇️ ELIMINAR MENSAJE DEBUG
                 GenServer.cast(game_pid, {:answer, username, answer})
-
               {:error, reason} ->
                 IO.puts("❌ Error al enviar respuesta: #{reason}")
             end
 
-          answer == "salir" ->
-            IO.puts("🚪 Saliendo de la partida...")
-            Trivia.Lobby.leave_game(id, username)
-            multiplayer_menu(username)
-
-          answer != "" ->
-            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
-            Process.sleep(100)
-            capture_answer(id, username)
+          answer == "/salir" ->
+            # Notificar al proceso principal que desea salir del lobby
+            send(parent_pid, {:leave_lobby, id, username})
+            :ok
 
           true ->
-            capture_answer(id, username)
+            IO.puts("❌ Respuesta inválida. Usa a, b, c o d.")
+            capture_answer(id, username, parent_pid)
         end
 
       _ ->
         IO.puts("❌ Error de entrada")
+        capture_answer(id, username, parent_pid)
     end
   end
 
