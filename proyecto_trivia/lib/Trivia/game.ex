@@ -100,11 +100,12 @@ defmodule Trivia.Game do
 
   def handle_info(:next_question, %{mode: :multi, questions: [q | rest]} = state) do
     IO.puts("\n==================================")
-    IO.puts("Lobby - Pregunta #{length(rest) + 1}/#{length(rest) + state.question_number}")
+    IO.puts("Pregunta #{length(state.questions) - length(rest)}/#{length(state.questions)}")
     IO.puts("Categoría: #{state.category}")
     IO.puts("==================================")
+
     # ⬇️ RESETEAR ESTADO DE RESPUESTAS PARA NUEVA PREGUNTA
-     reset_players =
+    reset_players =
       Enum.into(state.players, %{}, fn {username, data} ->
         {username, %{data | answered: false}}
       end)
