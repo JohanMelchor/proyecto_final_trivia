@@ -117,7 +117,8 @@ defmodule Trivia.Game do
       questions: rest,
       current: q,
       timer_ref: ref,
-      players: reset_players
+      players: reset_players,
+      current_responses: []
     }}
   end
 
