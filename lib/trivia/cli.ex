@@ -326,7 +326,7 @@ defmodule Trivia.CLI do
 
         play_game(pid, username)
 
-      {:feedback, correct, delta} ->
+      {:feedback, _correct, _delta} ->
         play_game(pid, username)
 
       {:timeout_notice, correct_answer} ->

@@ -124,7 +124,7 @@ defmodule Trivia.Game do
     }}
   end
 
-  def handle_info(:timeout, %{mode: :multi, current: q, players: players} = state) do
+  def handle_info(:timeout, %{mode: :multi, current: _q, players: players} = state) do
     # ⬇️ PENALIZAR JUGADORES QUE NO RESPONDIERON
     {updated_players, timeout_responses} =
       Enum.map_reduce(players, [], fn {username, data}, acc ->
@@ -307,7 +307,7 @@ defmodule Trivia.Game do
   end
 
   @impl true
-  def handle_cast({:player_disconnected, username}, %{mode: :multi, current: q, players: players} = state) do
+  def handle_cast({:player_disconnected, username}, %{mode: :multi, current: _q, players: players} = state) do
     # Si el jugador ya estaba marcado como answered, ignorar
     if Map.has_key?(players, username) do
       player = players[username]

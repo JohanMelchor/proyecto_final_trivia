@@ -1,6 +1,6 @@
 defmodule Trivia.Lobby do
   use GenServer
-  alias Trivia.{Game, SessionManager, QuestionBank, UserManager, History}
+  alias Trivia.{Game, SessionManager, QuestionBank}
 
   @max_players 4
 
@@ -167,6 +167,16 @@ defmodule Trivia.Lobby do
     end
   end
 
+  def handle_cast({:answer, username, answer}, state) do
+    if state.game_pid do
+      # Reenviar la respuesta al juego
+      GenServer.cast(state.game_pid, {:answer, username, answer})
+    else
+      IO.puts(" No hay partida activa para recibir respuestas")
+    end
+    {:noreply, state}
+  end
+
   # ===============================
   # Control de partida
   # ===============================
@@ -192,7 +202,7 @@ defmodule Trivia.Lobby do
     {:noreply, %{state | started: true, game_pid: game_pid, timer_ref: nil}}
   end
 
-  @impl true
+
   def handle_cast(:cancel, state) do
     if state.timer_ref do
       Process.cancel_timer(state.timer_ref)
@@ -211,19 +221,51 @@ defmodule Trivia.Lobby do
     {:stop, :normal, state}
   end
 
+  # Manejo de terminación para limpiar registro global
   @impl true
-  def handle_info(:timeout_lobby, state) do
-    unless state.started do
-      IO.puts(" Lobby #{state.id} cerrado por inactividad.")
-      send_message_to_all(state.players, {:game_message, "El lobby fue cerrado por inactividad."})
-      {:stop, :normal, state}
-    else
-      {:noreply, state}
-    end
+  def terminate(_reason, state) do
+    IO.puts(" Limpiando recursos del Lobby #{state.id}...")
+    # El nombre global se limpia automáticamente al terminar
+    :ok
   end
 
+  # ===============================
+  # handle_info de mensajes del juego
+  # ===============================
   @impl true
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
+  def handle_info({:question, q}, state) do
+    #  ENVIAR MENSAJE ESTRUCTURADO, NO STRINGS
+    send_message_to_all(state.players, {:question, q["question"], q["options"]})
+    {:noreply, state}
+  end
+
+  def handle_info(:game_finished, state) do
+    IO.puts(" Lobby #{state.id} finalizado. Cerrando...")
+    {:stop, :normal, state}
+  end
+
+  def handle_info({:player_answered, _username, _reason, _correct, _delta}, state) do
+    # reenviar a todos los clientes para notificación inmediata
+    {:noreply, state}
+  end
+
+  def handle_info({:question_summary, summary}, state) do
+    # summary es lista de {username, reason, correct, delta}
+    send_message_to_all(state.players, {:question_summary, summary})
+    {:noreply, state}
+  end
+
+  def handle_info({:timeout, _}, state) do
+    send_message_to_all(state.players, {:timeout, nil})
+    {:noreply, state}
+  end
+
+  def handle_info({:game_over, players}, state) do
+    send_message_to_all(state.players, {:game_over, players})
+    {:noreply, state}
+  end
+
+   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     case Enum.find(state.monitors || %{}, fn {_user, mref} -> mref == ref end) do
       {username, _} ->
         IO.puts(" PID no válido o proceso muerto para #{username}")
@@ -245,63 +287,14 @@ defmodule Trivia.Lobby do
     end
   end
 
-    @impl true
-  def handle_info(:game_finished, state) do
-    IO.puts(" Lobby #{state.id} finalizado. Cerrando...")
-    {:stop, :normal, state}
-  end
-
-  # Manejo de terminación para limpiar registro global
-  def terminate(_reason, state) do
-    IO.puts(" Limpiando recursos del Lobby #{state.id}...")
-    # El nombre global se limpia automáticamente al terminar
-    :ok
-  end
-
-  # ===============================
-  # Comunicación con Trivia.Game
-  # ===============================
-  @impl true
-  def handle_info({:question, q}, state) do
-    #  ENVIAR MENSAJE ESTRUCTURADO, NO STRINGS
-    send_message_to_all(state.players, {:question, q["question"], q["options"]})
-    {:noreply, state}
-  end
-
-  def handle_info({:player_answered, username, reason, correct, delta}, state) do
-    # reenviar a todos los clientes para notificación inmediata
-    {:noreply, state}
-  end
-
-  def handle_info({:question_summary, summary}, state) do
-    # summary es lista de {username, reason, correct, delta}
-    send_message_to_all(state.players, {:question_summary, summary})
-    {:noreply, state}
-  end
-
-  def handle_info({:timeout, _}, state) do
-    send_message_to_all(state.players, {:timeout, nil})
-    {:noreply, state}
-  end
-
-  def handle_info({:game_over, players}, state) do
-    send_message_to_all(state.players, {:game_over, players})
-    {:noreply, state}
-  end
-
-  # ===============================
-  # Manejo de respuestas
-  # ===============================
-
-  @impl true
-  def handle_cast({:answer, username, answer}, state) do
-    if state.game_pid do
-      # Reenviar la respuesta al juego
-      GenServer.cast(state.game_pid, {:answer, username, answer})
+  def handle_info(:timeout_lobby, state) do
+    unless state.started do
+      IO.puts(" Lobby #{state.id} cerrado por inactividad.")
+      send_message_to_all(state.players, {:game_message, "El lobby fue cerrado por inactividad."})
+      {:stop, :normal, state}
     else
-      IO.puts(" No hay partida activa para recibir respuestas")
+      {:noreply, state}
     end
-    {:noreply, state}
   end
 
   # ===============================

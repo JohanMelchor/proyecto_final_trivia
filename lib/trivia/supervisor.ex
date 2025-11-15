@@ -1,7 +1,7 @@
 defmodule Trivia.Supervisor do
   use Supervisor
 
-  @impl true
+
   # Callback requerido por :application (start/2)
   def start(_type, args) do
     start_link(args)

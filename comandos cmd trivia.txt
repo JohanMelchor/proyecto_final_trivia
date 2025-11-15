@@ -1,0 +1,9 @@
+iex --sname server -S mix
+
+iex --sname host --remsh server@XXXX -S mix		XXXX = R/echo %COMPUTERNAME%
+iex --sname invitado --remsh server@XXXX -S mix		XXXX = R/echo %COMPUTERNAME%
+
+Trivia.CLI.start_server
+Trivia.CLI.start
+
+echo %COMPUTERNAME%
