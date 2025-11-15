@@ -1,7 +1,7 @@
 # ProyectoTrivia
 
 **Proyecto Final Trivia Programacion 3 en Elixir
- Autores: Maria Jose Ocampo Tovar
+ Autores: Maria Jose Ocampo Tovar -
           Johan Esteban Melchor Morales**
 
 ## Installation
