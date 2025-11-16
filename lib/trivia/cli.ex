@@ -1,16 +1,43 @@
 defmodule Trivia.CLI do
+  @moduledoc """
+  Interfaz de línea de comandos (CLI) para el juego de trivia.
+
+  Este módulo es la interacción con el usuario: login/registro,
+  menús, creación y unión a lobbies, ejecución de partidas (single y multi)
+  y algunas utilidades de entrada.
+
+  Estructura resumida de funciones principales:
+  - start/0: arranca la CLI y asegura que la aplicación esté iniciada.
+  - start_server/0: opción para ejecutar el supervisor en modo servidor.
+  - auth_menu/0, login_flow/0, register_flow/0: flujo de autenticación.
+  - main_menu/1: menú principal del usuario autenticado.
+  - multiplayer_menu/1, create_game_flow/1, join_game_flow/1, list_games_flow/1:
+    menús y flujos para la parte multijugador.
+  - host_lobby_menu/2, guest_lobby_menu/2, listen_multiplayer/2:
+    interacción dentro de lobbies (host y guests).
+  - start_single_game/1, play_game/2, capture_single_answer/1:
+    lógica para jugar en modo individual.
+  - utilidades: seleccionar_opcion/1, pedir_numero/2, flush_mailbox/0, handle_input/1, etc.
+  """
+
   alias Trivia.{UserManager, SessionManager, Server, Game, QuestionBank}
 
-  # ===============================
-  # PUNTO DE ENTRADA
-  # ===============================
+  @doc """
+  Punto de entrada de la CLI.
+
+  Asegura que la aplicación esté inicializada y muestra el menú de autenticación.
+  """
   def start do
     IO.puts("\n===  Bienvenido  ===\n")
     Application.ensure_all_started(:proyecto_trivia)
     auth_menu()
   end
 
-  # Solo inicia los procesos globales
+  @doc """
+  Ejecuta el proceso en modo servidor (bloqueante).
+
+  Útil cuando quieres arrancar sólo el supervisor/servidor.
+  """
   def start_server do
     Application.ensure_all_started(:proyecto_trivia)
     IO.puts("\n===  SERVIDOR DE TRIVIA INICIADO (supervisor) ===\n")
@@ -18,9 +45,7 @@ defmodule Trivia.CLI do
     Process.sleep(:infinity)
   end
 
-  # ===============================
-  # MENÚ DE AUTENTICACIÓN
-  # ===============================
+  # "Menú de autenticación principal (login/registro/salir)."
   defp auth_menu do
     IO.puts("""
     === AUTENTICACIÓN ===
@@ -39,6 +64,7 @@ defmodule Trivia.CLI do
     end
   end
 
+  # "Flujo de login: solicita credenciales y conecta la sesión."
   defp login_flow do
     username = IO.gets("Usuario: ") |> String.trim()
     password = IO.gets("Contraseña: ") |> String.trim()
@@ -54,6 +80,7 @@ defmodule Trivia.CLI do
     end
   end
 
+  # "Flujo de registro: solicita nombre y contraseña y crea el usuario."
   defp register_flow do
     username = IO.gets("Nuevo usuario: ") |> String.trim()
     password = IO.gets("Contraseña: ") |> String.trim()
@@ -69,9 +96,7 @@ defmodule Trivia.CLI do
     end
   end
 
-  # ===============================
-  # MENÚ PRINCIPAL
-  # ===============================
+  # "Menú principal mostrado tras iniciar sesión."
   defp main_menu(username) do
     IO.puts("""
     === MENÚ PRINCIPAL ===
@@ -102,9 +127,7 @@ defmodule Trivia.CLI do
     end
   end
 
-  # ===============================
-  # MULTIJUGADOR
-  # ===============================
+  # "Menú para opciones multijugador."
   defp multiplayer_menu(username) do
     IO.puts("""
     ===  MODO MULTIJUGADOR ===
@@ -125,6 +148,13 @@ defmodule Trivia.CLI do
     end
   end
 
+
+  #Flujo para crear una partida multijugador.
+
+  #- Muestra categorías.
+  #- Pide número de preguntas y tiempo.
+  #- Crea el lobby en Server/Lobby.
+
   defp create_game_flow(username) do
     if not SessionManager.online?(username) do
       IO.puts(" Debes estar conectado al servidor.\n")
@@ -138,12 +168,10 @@ defmodule Trivia.CLI do
       else
         IO.puts("\n===  Configuración de la partida multijugador ===\n")
 
-        # Mostrar categorías disponibles con numeración
         Enum.each(Enum.with_index(categories, 1), fn {cat, i} ->
           IO.puts("#{i}. #{String.capitalize(cat)}")
         end)
 
-        # Usar la misma función que singleplayer
         category = seleccionar_opcion(categories)
         num = pedir_numero("Número de preguntas:", 3)
         time = pedir_numero("Tiempo por pregunta (segundos):", 10)
@@ -171,12 +199,19 @@ defmodule Trivia.CLI do
     end
   end
 
+
+  #Flujo para unirse a una partida existente.
+
+  #Maneja errores: lobby lleno, partida iniciada, ya estás en la partida, lobby no existe.
+
   defp join_game_flow(username) do
     id = pedir_numero("ID de partida:", 0)
+
     case Trivia.Lobby.join_game(id, username, self()) do
       {:ok, msg} ->
         IO.puts(" #{msg}")
         guest_lobby_menu(id, username)
+
       {:error, :full} ->
         IO.puts("\n❌ La partida está llena (máximo 4 jugadores)\n")
         multiplayer_menu(username)
@@ -199,6 +234,7 @@ defmodule Trivia.CLI do
     end
   end
 
+  # "Lista partidas activas (filtra lobbies ya terminados)."
   defp list_games_flow(username) do
     IO.puts("\n=== Partidas activas ===")
     games = Server.list_games()
@@ -209,7 +245,7 @@ defmodule Trivia.CLI do
       Enum.each(games, fn id ->
         # Verificar que el lobby sigue activo antes de mostrar
         case :global.whereis_name({:lobby, id}) do
-          :undefined -> :ok  # Lobby terminado, no mostrar
+          :undefined -> :ok
           _pid -> IO.puts("• ID: #{id}")
         end
       end)
@@ -218,9 +254,11 @@ defmodule Trivia.CLI do
     multiplayer_menu(username)
   end
 
-  # ===============================
-  # LOBBY
-  # ===============================
+
+  #Menú para el host del lobby:
+  # - Opción 1: iniciar la partida (arranca Game).
+  # - Opción 2: cancelar la partida (termina lobby).
+
   defp host_lobby_menu(id, username) do
     IO.puts("\n===  Lobby #{id} (Host: #{username}) ===")
     IO.puts("1. Iniciar partida")
@@ -230,18 +268,25 @@ defmodule Trivia.CLI do
       "1" ->
         Trivia.Lobby.start_game(id)
         IO.puts(" Partida iniciada! Espera las preguntas...\n")
-        listen_multiplayer(id, username)  #  Pasar id y username
+        listen_multiplayer(id, username)
+
       "2" ->
         Trivia.Lobby.cancel_game(id)
         IO.puts(" Partida cancelada.\n")
         multiplayer_menu(username)
+
       _ ->
         host_lobby_menu(id, username)
     end
   end
 
+
+  # Menú para guest en lobby.
+  # - Limpia mailbox para evitar mensajes antiguos.
+  # - Lanza proceso para leer una entrada no bloqueante.
+  # - Escucha mensajes del lobby con listen_multiplayer/2.
+
   defp guest_lobby_menu(id, username) do
-    # Limpiar mensajes pendientes (evita que mensajes del lobby anterior se mezclen)
     flush_mailbox()
 
     IO.puts("\n===  Esperando inicio de partida #{id} ===")
@@ -249,21 +294,20 @@ defmodule Trivia.CLI do
 
     parent = self()
 
-    # Spawn sólo para leer la entrada y notificar al proceso principal.
     spawn(fn ->
       case IO.gets("Opción: ") |> handle_input() do
         "1" ->
-          # Enviar mensaje con el id del lobby para evitar mezclar con lobbies anteriores
           send(parent, {:leave_lobby, id, username})
+
         _ ->
-          # Notificar entrada inválida (se ignora si ya no corresponde al lobby)
           send(parent, {:guest_input_invalid, id})
       end
     end)
 
     listen_multiplayer(id, username)
   end
-  # vacía el mailbox del proceso para evitar usar mensajes viejos
+
+  # "Limpia el mailbox del proceso actual (helper)."
   defp flush_mailbox do
     receive do
       _ -> flush_mailbox()
@@ -272,9 +316,7 @@ defmodule Trivia.CLI do
     end
   end
 
-  # ===============================
-  # PARTIDA INDIVIDUAL
-  # ===============================
+  # Flujo para iniciar partida individual: configura parámetros y solicita a Server iniciar el Game.
   defp start_single_game(username) do
     IO.puts("\n===  Configuración de partida individual ===\n")
 
@@ -293,12 +335,12 @@ defmodule Trivia.CLI do
       time = pedir_numero("Tiempo por pregunta (segundos):", 10)
 
       case Server.start_game(%{
-            username: username,
-            category: category,
-            num: num,
-            time: time,
-            mode: :single
-          }) do
+             username: username,
+             category: category,
+             num: num,
+             time: time,
+             mode: :single
+           }) do
         {:ok, pid} ->
           IO.puts(" Partida iniciada correctamente!\n")
           play_game(pid, username)
@@ -310,6 +352,10 @@ defmodule Trivia.CLI do
     end
   end
 
+  # Bucle principal para jugar en modo singleplayer.
+  # - Recibe mensajes {:question, ...}, {:feedback, ...}, {:timeout_notice, ...}, {:game_over, ...}.
+  # - Para cada pregunta lanza capture_single_answer/1 en proceso separado.
+
   defp play_game(pid, username) do
     receive do
       {:question, question, options} ->
@@ -320,9 +366,7 @@ defmodule Trivia.CLI do
         IO.puts(String.duplicate("=", 50))
 
         # Pedir respuesta en un proceso separado para no bloquear
-        spawn(fn ->
-          capture_single_answer(pid)
-        end)
+        spawn(fn -> capture_single_answer(pid) end)
 
         play_game(pid, username)
 
@@ -352,32 +396,36 @@ defmodule Trivia.CLI do
     end
   end
 
+  # Solicita y valida una respuesta en singleplayer; reintenta si es inválida.
   defp capture_single_answer(pid) do
-    answer = IO.gets("\nTu respuesta (a, b, c, d): ")
-             |> String.trim()
-             |> String.downcase()
+    answer =
+      IO.gets("\nTu respuesta (a, b, c, d): ")
+      |> String.trim()
+      |> String.downcase()
 
     if answer in ["a", "b", "c", "d"] do
       Game.answer(pid, answer)
     else
       IO.puts(" Respuesta inválida. Usa a, b, c o d.")
-      capture_single_answer(pid)  #  Reintentar recursivamente
+      capture_single_answer(pid)
     end
   end
 
-  # ===============================
-  # UTILIDADES
-  # ===============================
+  # Selecciona una opción de la lista de categorías.
+  # - Devuelve la categoría seleccionada o la primera por defecto.
   defp seleccionar_opcion(categories) do
     opt = IO.gets("\nSeleccione una categoría: ") |> String.trim()
+
     case Integer.parse(opt) do
-      {n, _} when n in 1..length(categories)//1 ->  #  Corregir el warning del rango
+      {n, _} when n in 1..length(categories)//1 ->
         Enum.at(categories, n - 1)
+
       _ ->
         hd(categories)
     end
   end
 
+  # Lee un número de entrada; si no es válido devuelve default.
   defp pedir_numero(pregunta, default) do
     case IO.gets("#{pregunta} ") |> String.trim() |> Integer.parse() do
       {n, _} when n > 0 -> n
@@ -385,20 +433,25 @@ defmodule Trivia.CLI do
     end
   end
 
+  # Muestra el puntaje del usuario y vuelve al menú principal.
   defp show_score(username) do
     case UserManager.get_score(username) do
       {:ok, score} -> IO.puts("\nTu Puntaje actual: #{score}\n")
       _ -> IO.puts("\n Usuario no encontrado o error.\n")
     end
+
     main_menu(username)
   end
 
+  # Muestra ranking general (usa UserManager.load_users()).
   def show_ranking(username) do
     users = UserManager.load_users()
+
     if users == [] do
       IO.puts("\n No hay usuarios registrados todavía.\n")
     else
       IO.puts("\n===  RANKING GENERAL ===\n")
+
       users
       |> Enum.sort_by(&(-&1["score"]))
       |> Enum.with_index(1)
@@ -406,9 +459,11 @@ defmodule Trivia.CLI do
         IO.puts("#{i}. #{user["username"]} — #{user["score"]} puntos")
       end)
     end
+
     main_menu(username)
   end
 
+  # Muestra historial (llama Trivia.History.show_last/1) y vuelve al menú.
   def show_history(username) do
     IO.puts("\n=== Historial de Partidas ===\n")
     Trivia.History.show_last(10)
@@ -416,8 +471,12 @@ defmodule Trivia.CLI do
     main_menu(username)
   end
 
+  # Trim de entrada (helper).
   defp handle_input(input), do: String.trim(input)
 
+  # Escucha mensajes del lobby/multijugador.
+  # - Filtra por id de lobby en los mensajes recibidos.
+  # - Muestra preguntas, resumen y maneja retorno a menús.
   defp listen_multiplayer(id, username) do
     receive do
       {:leave_lobby, ^id, _user} ->
@@ -434,7 +493,6 @@ defmodule Trivia.CLI do
         # Ignorar y seguir escuchando (usuario puede reingresar)
         listen_multiplayer(id, username)
 
-      # ... rest of messages ...
       {:game_message, msg} ->
         IO.puts("\n #{msg}")
         listen_multiplayer(id, username)
@@ -443,16 +501,20 @@ defmodule Trivia.CLI do
         IO.puts("\n" <> String.duplicate("=", 50))
         IO.puts(" RESUMEN DE RESPUESTAS:")
         IO.puts(String.duplicate("-", 50))
+
         Enum.each(summary, fn
           {user, :timeout, _correct, delta} ->
             IO.puts("#{user}: tiempo agotado (#{delta} pts)")
+
           {user, :answered, correct, delta} ->
             status = if correct, do: " Correcto", else: " Incorrecto"
             IO.puts("#{user}: #{status} (#{delta} pts)")
+
           {user, _other, correct, delta} ->
             status = if correct, do: " Correcto", else: " Incorrecto"
             IO.puts("#{user}: #{status} (#{delta} pts)")
         end)
+
         IO.puts(String.duplicate("=", 50))
         listen_multiplayer(id, username)
 
@@ -472,11 +534,14 @@ defmodule Trivia.CLI do
         case reason do
           :timeout ->
             IO.puts("#{user}:  tiempo agotado (#{delta} pts)")
+
           :answered ->
             IO.puts("#{user}: #{if correct, do: " Correcto", else: " Incorrecto"} (#{delta} pts)")
+
           _ ->
             IO.puts("#{user}: #{if correct, do: " Correcto", else: " Incorrecto"} (#{delta} pts)")
         end
+
         listen_multiplayer(id, username)
 
       {:timeout, _} ->
@@ -512,6 +577,11 @@ defmodule Trivia.CLI do
     end
   end
 
+
+  #Captura respuesta del usuario en multiplayer y la envía al Game.
+  #- Si el usuario escribe "/salir" notifica al proceso padre para abandonar el lobby.
+  #- Reintenta si la entrada es inválida.
+
   defp capture_answer(id, username, parent_pid) do
     IO.write("Tu respuesta (a, b, c, d): ")
 
@@ -528,6 +598,7 @@ defmodule Trivia.CLI do
             case get_game_pid_from_lobby(id) do
               {:ok, game_pid} ->
                 GenServer.cast(game_pid, {:answer, username, answer})
+
               {:error, reason} ->
                 IO.puts(" Error al enviar respuesta: #{reason}")
             end
@@ -548,13 +619,18 @@ defmodule Trivia.CLI do
     end
   end
 
+
+  #Helper: obtiene game_pid desde el lobby global.
+  # Maneja timeouts y errores de comunicación.
+
   defp get_game_pid_from_lobby(id) do
     case :global.whereis_name({:lobby, id}) do
       :undefined ->
         {:error, "Lobby no encontrado"}
+
       lobby_pid ->
         try do
-          game_pid = GenServer.call(lobby_pid, :get_game_pid, 5000)  # 5 segundos timeout
+          game_pid = GenServer.call(lobby_pid, :get_game_pid, 5000)
           if game_pid && Process.alive?(game_pid) do
             {:ok, game_pid}
           else

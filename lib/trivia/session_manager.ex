@@ -1,11 +1,21 @@
 defmodule Trivia.SessionManager do
   @moduledoc """
-  Gestiona las sesiones de los usuarios conectados al servidor.
-  Cada sesión se asocia al nombre de usuario y su PID de CLI.
+  Módulo responsable de gestionar las sesiones de usuarios conectados al servidor de trivia.
 
-   Modo distribuido (global):
-  - Se registra globalmente con {:global, Trivia.SessionManager}.
-  - Los clientes remotos pueden autenticarse, desconectarse o consultar usuarios en línea.
+  Este GenServer mantiene un registro global de todos los usuarios en línea, asociando
+  cada nombre de usuario con su PID y estado de conexión.
+
+  ## Características principales:
+  - Registro global distribuido usando `:global` para acceso desde múltiples nodos
+  - Autenticación de usuarios contra el UserManager
+  - Gestión de conexiones y desconexiones
+  - Consulta de usuarios en línea
+  - Verificación de estado de conexión
+
+  ## Modo distribuido:
+  - Se registra globalmente con `{:global, Trivia.SessionManager}`
+  - Los clientes remotos pueden autenticarse, desconectarse o consultar usuarios en línea
+  - Soporta operaciones desde múltiples nodos en un cluster Erlang/Elixir
   """
 
   use GenServer
@@ -15,8 +25,20 @@ defmodule Trivia.SessionManager do
   # API pública
   # ===============================
 
+  @doc """
+  Inicia el SessionManager con registro global.
+
+  Si ya existe una instancia global registrada, retorna el PID existente.
+  De lo contrario, crea una nueva instancia.
+
+  ## Parámetros:
+    - `args`: Argumentos de inicialización (no utilizados actualmente)
+
+  ## Retorna:
+    - `{:ok, pid}` en caso de éxito
+    - `{:error, reason}` en caso de error al iniciar el GenServer
+  """
   def start_link(_args) do
-    # Si ya existe globalmente, devolver {:ok, pid_existente} en lugar de error
     case :global.whereis_name(__MODULE__) do
       :undefined ->
         GenServer.start_link(__MODULE__, %{}, name: {:global, __MODULE__})
@@ -25,37 +47,84 @@ defmodule Trivia.SessionManager do
     end
   end
 
-  #  Conectar usuario (ya registrado)
+  @doc """
+  Autentica y conecta un usuario al sistema.
+
+  Verifica las credenciales del usuario contra el UserManager y, si son válidas,
+  registra al usuario como conectado en el SessionManager.
+
+  ## Parámetros:
+    - `username`: Nombre de usuario a autenticar
+    - `password`: Contraseña del usuario
+    - `caller`: PID del proceso que solicita la conexión
+
+  ## Retorna:
+    - `{:ok, "Conectado exitosamente"}` si la autenticación es exitosa
+    - `{:error, reason}` si la autenticación falla o el usuario ya está conectado
+  """
   def connect(username, password, caller) do
     GenServer.call({:global, __MODULE__}, {:connect, username, password, caller})
   end
 
-  #  Desconectar usuario
+  @doc """
+  Desconecta a un usuario del sistema.
+
+  Elimina al usuario del registro de sesiones activas.
+
+  ## Parámetros:
+    - `username`: Nombre de usuario a desconectar
+
+  ## Retorna:
+    - `:ok` si la desconexión fue exitosa
+    - `{:error, "Usuario no conectado"}` si el usuario no estaba conectado
+  """
   def disconnect(username) do
     GenServer.call({:global, __MODULE__}, {:disconnect, username})
   end
 
-  #  Listar usuarios en línea
+  @doc """
+  Obtiene la lista de todos los usuarios actualmente en línea.
+
+  ## Retorna:
+    - Lista de strings con el formato "usuario (nodo)" para cada usuario conectado
+  """
   def list_online do
     GenServer.call({:global, __MODULE__}, :list_online)
   end
 
-  #  Verificar si un usuario está conectado
+  @doc """
+  Verifica si un usuario específico está conectado al sistema.
+
+  ## Parámetros:
+    - `username`: Nombre de usuario a verificar
+
+  ## Retorna:
+    - `true` si el usuario está conectado
+    - `false` si el usuario no está conectado
+  """
   def online?(username) do
     GenServer.call({:global, __MODULE__}, {:check_online, username})
   end
 
   # ===============================
-  # Callbacks internos
+  # Callbacks internos del GenServer
   # ===============================
 
+  @doc """
+  Inicializa el estado del SessionManager.
+  """
   @impl true
   def init(_args) do
     IO.puts(" Servidor global de sesiones iniciado.")
     {:ok, %{}}
   end
 
-  # LOGIN
+  @doc """
+  Maneja la solicitud de conexión de un usuario.
+
+  Realiza la autenticación a través del UserManager y, si es exitosa,
+  agrega al usuario al estado de sesiones activas.
+  """
   @impl true
   def handle_call({:connect, username, password, caller}, _from, state) do
     case UserManager.authenticate(username, password) do
@@ -70,8 +139,8 @@ defmodule Trivia.SessionManager do
     end
   end
 
-
-  #  Desconectar usuario
+  #Maneja la solicitud de desconexión de un usuario.
+  #Elimina al usuario del estado de sesiones activas si existe.
   @impl true
   def handle_call({:disconnect, username}, _from, state) do
     if Map.has_key?(state, username) do
@@ -82,7 +151,8 @@ defmodule Trivia.SessionManager do
     end
   end
 
-  # Listar usuarios en línea
+  #Maneja la solicitud de listar usuarios en línea.
+  #Formatea la información de usuarios conectados para su presentación.
   @impl true
   def handle_call(:list_online, _from, state) do
     users =
@@ -94,7 +164,9 @@ defmodule Trivia.SessionManager do
     {:reply, users, state}
   end
 
-  # Verificar conexión
+
+  #Maneja la verificación de estado de conexión de un usuario.
+  #Verifica si el usuario existe en el estado de sesiones activas.
   @impl true
   def handle_call({:check_online, username}, _from, state) do
     {:reply, Map.has_key?(state, username), state}

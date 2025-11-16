@@ -75,6 +75,7 @@ defmodule Trivia.UserManager do
 
   # ---------- Funciones internas ----------
 
+  # Carga usuarios desde el archivo JSON
   def load_users do
     case File.read(@file_path) do
       {:ok, content} ->
@@ -88,6 +89,7 @@ defmodule Trivia.UserManager do
     end
   end
 
+  # Guarda usuarios en el archivo JSON
   defp save_users(users) do
     json = Jason.encode!(users, pretty: true)
     File.write!(@file_path, json)

@@ -1,41 +1,89 @@
 defmodule Trivia.Game do
+  @moduledoc """
+  GenServer que gestiona la lógica de una partida (single y multi).
+
+  Responsabilidades:
+  - Inicializar la partida (preguntas, jugadores).
+  - Enviar preguntas y manejar temporizadores (:next_question / :timeout).
+  - Recibir respuestas y actualizar puntajes.
+  - En modo multijugador: acumular respuestas y enviar un resumen al Lobby
+    cuando todos respondan o ocurra timeout.
+  - En modo singleplayer: enviar feedback directo al proceso que inició el juego.
+
+  API pública:
+  - start_link(args :: map) -> inicia el GenServer con la configuración.
+  - answer(pid_or_lobby, ...) -> enviar respuestas (soporta single y multi).
+  """
+
   use GenServer
   alias Trivia.{UserManager, QuestionBank, History}
 
-  # ===============================
+  # -----------------------
   # API pública
-  # ===============================
+  # -----------------------
 
+  @doc """
+  Inicia el GenServer de la partida.
+
+  args (map) esperado:
+  - Multi: %{mode: :multi, lobby_pid: pid, players: %{username => %{pid: pid, score: 0}}, category:, num:, time:}
+  - Single: %{mode: :single, username:, category:, num:, time:, caller: pid}
+  """
   def start_link(args) when is_map(args) do
     GenServer.start_link(__MODULE__, args)
   end
 
-  # Unificada: el CLI puede pasar 2 o 3 argumentos según el modo
-  def answer(pid, answer), do: GenServer.cast(pid, {:answer, answer})
+  @doc "Enviar respuesta a un juego single (pid)."
+  def answer(pid, answer) when is_pid(pid), do: GenServer.cast(pid, {:answer, answer})
+
+  @doc """
+  Enviar respuesta en modo multijugador indicando el lobby y el usuario.
+  El Lobby redirige al Game; si el lobby no existe devuelve error.
+  """
   def answer(lobby_id, username, answer) do
     case :global.whereis_name({:lobby, lobby_id}) do
-      :undefined ->
-        {:error, "Lobby no encontrado"}
-      pid ->
-        GenServer.cast(pid, {:answer, username, answer})
+      :undefined -> {:error, "Lobby no encontrado"}
+      pid -> GenServer.cast(pid, {:answer, username, answer})
     end
   end
 
-  # ===============================
+  # -----------------------
+  # Integración con DynamicSupervisor
+  # -----------------------
+
+  @doc """
+  child_spec permite arrancar el juego bajo un DynamicSupervisor con restart: :temporary.
+  """
+  def child_spec(arg) do
+    %{
+      id: {__MODULE__, arg[:lobby_id] || make_ref()},
+      start: {__MODULE__, :start_link, [arg]},
+      restart: :temporary,
+      shutdown: 5_000,
+      type: :worker
+    }
+  end
+
+  @doc "Cancelar timers/limpiar recursos al terminar."
+  @impl true
+  def terminate(_reason, state) do
+    if Map.get(state, :timer_ref), do: Process.cancel_timer(state.timer_ref)
+    :ok
+  end
+
+  # -----------------------
   # Inicialización
-  # ===============================
+  # -----------------------
 
   @impl true
   def init(%{mode: :multi} = args) do
     IO.puts("\n Iniciando partida MULTIJUGADOR en '#{args.category}'...\n")
-
     questions = QuestionBank.get_random_questions(args.category, args.num)
 
     if questions == [] do
       IO.puts(" No hay preguntas disponibles para la categoría #{args.category}.")
       {:stop, :no_questions}
     else
-      #  INICIALIZAR JUGADORES CON ESTADO answered: false
       players_with_state =
         Enum.into(args.players, %{}, fn {username, data} ->
           {username, Map.put(data, :answered, false)}
@@ -60,7 +108,6 @@ defmodule Trivia.Game do
 
   @impl true
   def init(%{mode: :single, username: username, category: category, num: num, time: time, caller: caller}) do
-
     questions = QuestionBank.get_random_questions(category, num)
 
     state = %{
@@ -77,25 +124,23 @@ defmodule Trivia.Game do
       question_number: 0
     }
 
-    # Iniciar inmediatamente con la primera pregunta
     Process.send_after(self(), :next_question, 100)
     {:ok, state}
   end
 
-  # ===============================
-  # MANEJO DE PREGUNTAS
-  # ===============================
+  # -----------------------
+  # Manejo de preguntas / timeouts
+  # -----------------------
 
-  # --- MULTIJUGADOR ---
+  # MULTIJUGADOR: fin de preguntas
   @impl true
   def handle_info(:next_question, %{mode: :multi, questions: []} = state) do
     Enum.each(state.players, fn {username, %{score: score}} ->
-      Trivia.UserManager.update_score(username, score)
-      Trivia.History.save_result(username, state.category, score)
+      UserManager.update_score(username, score)
+      History.save_result(username, state.category, score)
     end)
 
     send(state.lobby_pid, {:game_over, state.players})
-
     send(state.lobby_pid, :game_finished)
     {:stop, :normal, state}
   end
@@ -106,7 +151,6 @@ defmodule Trivia.Game do
     IO.puts("Categoría: #{state.category}")
     IO.puts("==================================")
 
-    # ⬇️ RESETEAR ESTADO DE RESPUESTAS PARA NUEVA PREGUNTA
     reset_players =
       Enum.into(state.players, %{}, fn {username, data} ->
         {username, %{data | answered: false}}
@@ -124,61 +168,45 @@ defmodule Trivia.Game do
     }}
   end
 
+  # MULTIJUGADOR: timeout de la pregunta
   def handle_info(:timeout, %{mode: :multi, current: _q, players: players} = state) do
-    # ⬇️ PENALIZAR JUGADORES QUE NO RESPONDIERON
     {updated_players, timeout_responses} =
       Enum.map_reduce(players, [], fn {username, data}, acc ->
         if not data.answered do
-          # Penalizar por no responder (-5 puntos)
           new_data = %{data | score: data.score - 5, answered: true}
-          # respuesta con razón :timeout
           resp = {username, :timeout, false, -5}
-          { {username, new_data}, [resp | acc] }
+          {{username, new_data}, [resp | acc]}
         else
-          { {username, data}, acc }
+          {{username, data}, acc}
         end
       end)
 
-    # enviar resumen compuesto por las respuestas ya recibidas + las de timeout
     combined_summary = Enum.reverse(state.current_responses) ++ Enum.reverse(timeout_responses)
     send(state.lobby_pid, {:question_summary, combined_summary})
-
-    # notificar timeout general (opcional, el lobby ya recibirá question_summary)
     send(state.lobby_pid, {:timeout, state.current})
 
     Process.send_after(self(), :next_question, 2000)
     {:noreply, %{state | current: nil, timer_ref: nil, players: Enum.into(updated_players, %{}), current_responses: []}}
   end
 
-  # --- SINGLEPLAYER ---
+  # SINGLEPLAYER: fin de preguntas
   @impl true
   def handle_info(:next_question, %{mode: :single, questions: []} = state) do
     IO.puts(" Fin del juego - Puntaje final: #{state.score}")
     UserManager.update_score(state.username, state.score)
     History.save_result(state.username, state.category, state.score)
 
-    if state.caller do
-      send(state.caller, {:game_over, state.score})
-    end
-
+    if state.caller, do: send(state.caller, {:game_over, state.score})
     {:stop, :normal, state}
   end
 
   def handle_info(:next_question, %{mode: :single, questions: [q | rest]} = state) do
-    # Cancelar timer anterior si existe
-    if state.timer_ref do
-      Process.cancel_timer(state.timer_ref)
-    end
+    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
 
-    # Enviar pregunta al jugador
     question_number = state.question_number + 1
     IO.puts("\n=== Pregunta #{question_number} ===")
+    if state.caller, do: send(state.caller, {:question, q["question"], q["options"]})
 
-    if state.caller do
-      send(state.caller, {:question, q["question"], q["options"]})
-    end
-
-    # Configurar nuevo temporizador
     timer_ref = Process.send_after(self(), :timeout, state.time * 1000)
 
     {:noreply, %{state |
@@ -195,15 +223,10 @@ defmodule Trivia.Game do
     IO.puts(" Tiempo agotado para: #{q["question"]}")
     IO.puts(" Respuesta correcta: #{q["answer"]}")
 
-    # Penalización por tiempo agotado
     new_score = state.score - 1
     IO.puts(" Penalización: -1 puntos | Puntaje actual: #{new_score}")
+    if state.caller, do: send(state.caller, {:timeout_notice, q["answer"]})
 
-    if state.caller do
-      send(state.caller, {:timeout_notice, q["answer"]})
-    end
-
-    # Programar siguiente pregunta después de breve pausa
     Process.send_after(self(), :next_question, 2000)
 
     {:noreply, %{state |
@@ -214,15 +237,13 @@ defmodule Trivia.Game do
     }}
   end
 
-  def handle_info(:timeout, %{mode: :single, answered: true} = state) do
-    # Ignorar timeout si ya se respondió
-    {:noreply, state}
-  end
+  def handle_info(:timeout, %{mode: :single, answered: true} = state), do: {:noreply, state}
 
-  # ===============================
-  # RESPUESTAS
-  # ===============================
+  # -----------------------
+  # Manejo de respuestas
+  # -----------------------
 
+  # MULTIJUGADOR: recibir respuesta de un jugador (username, ans)
   @impl true
   def handle_cast({:answer, username, ans}, %{mode: :multi, current: q} = state) do
     if q && Map.has_key?(state.players, username) do
@@ -237,23 +258,15 @@ defmodule Trivia.Game do
         updated_players =
           Map.update!(state.players, username, fn p -> %{p | score: p.score + delta, answered: true} end)
 
-        # incluir razón :answered en la respuesta
         response = {username, :answered, correct, delta}
         new_responses = [response | state.current_responses]
 
-        # enviar aviso individual (puede mostrarse en CLI instantáneamente)
-        send(state.lobby_pid, {:player_answered, username, :answered, correct, delta})
-
-        # Verificar si todos respondieron
+        # No enviar notificación inmediata; sólo enviar resumen cuando todos respondan.
         all_answered = Enum.all?(updated_players, fn {_, p} -> p.answered end)
 
         if all_answered do
-          # ⬇️ ENVIAR RESUMEN CUANDO TODOS HAYAN RESPONDIDO
           send(state.lobby_pid, {:question_summary, Enum.reverse(new_responses)})
-
-          if state.timer_ref do
-            Process.cancel_timer(state.timer_ref)
-          end
+          if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
           Process.send_after(self(), :next_question, 2000)
         end
 
@@ -264,29 +277,19 @@ defmodule Trivia.Game do
     end
   end
 
-  # --- SINGLEPLAYER ---
+  # SINGLEPLAYER: respuesta del jugador single
   @impl true
   def handle_cast({:answer, answer}, %{mode: :single, current: q, answered: false} = state) do
-    # Cancelar timer inmediatamente
-    if state.timer_ref do
-      Process.cancel_timer(state.timer_ref)
-    end
+    if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
 
-    # Verificar respuesta
     user_answer = String.downcase(String.trim(answer))
     correct_answer = String.downcase(String.trim(q["answer"]))
     is_correct = user_answer == correct_answer
 
-    # Calcular puntaje
     delta = if is_correct, do: 5, else: -3
     new_score = state.score + delta
 
-    # Enviar feedback al CLI
-    if state.caller do
-      send(state.caller, {:feedback, is_correct, delta})
-    end
-
-    # Programar siguiente pregunta después de breve pausa
+    if state.caller, do: send(state.caller, {:feedback, is_correct, delta})
     Process.send_after(self(), :next_question, 2000)
 
     {:noreply, %{state |
@@ -306,25 +309,22 @@ defmodule Trivia.Game do
     {:noreply, state}
   end
 
+  # Manejo cuando un jugador se desconecta en medio de la pregunta
   @impl true
   def handle_cast({:player_disconnected, username}, %{mode: :multi, current: _q, players: players} = state) do
-    # Si el jugador ya estaba marcado como answered, ignorar
     if Map.has_key?(players, username) do
       player = players[username]
       if player.answered do
         {:noreply, state}
       else
-        # aplicar penalización por desconexión / no respuesta
         delta = -5
         updated_players = Map.update!(players, username, fn p -> %{p | score: p.score + delta, answered: true} end)
         resp = {username, :timeout, false, delta}
         new_responses = [resp | state.current_responses]
 
-        # comprobar si ya todos respondieron
         all_answered = Enum.all?(updated_players, fn {_u, p} -> p.answered end)
 
         if all_answered do
-          # enviar resumen y programar siguiente pregunta
           send(state.lobby_pid, {:question_summary, Enum.reverse(new_responses)})
           if state.timer_ref, do: Process.cancel_timer(state.timer_ref)
           Process.send_after(self(), :next_question, 2000)
